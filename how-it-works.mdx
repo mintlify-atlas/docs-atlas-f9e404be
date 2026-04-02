@@ -1,0 +1,246 @@
+---
+title: "How it works"
+description: "The push lifecycle, encryption model, expiration mechanics, audit logging, and URL token generation explained."
+---
+
+This page explains the internals of Password Pusher: how secrets move from creation through expiration, how they are protected at rest, and what gets recorded along the way.
+
+## The push lifecycle
+
+Every secret you share follows the same lifecycle:
+
+<Steps>
+  <Step title="Creation">
+    You submit a secret through the UI or API. Before the record is saved, Password Pusher:
+
+    - Clamps `expire_after_days` and `expire_after_views` to the configured min/max range.
+    - Generates a unique URL token (`set_url_token`).
+    - Encrypts `payload`, `passphrase`, and `note` using the lockbox gem.
+    - Creates a `creation` audit log entry.
+    - Returns a shareable URL containing only the token — never the secret itself.
+  </Step>
+  <Step title="Link sharing">
+    You share the URL with the recipient. The URL contains only the opaque token (e.g., `/p/aBcDeFgHiJkL`). No secret data is embedded in the URL.
+  </Step>
+  <Step title="View counting">
+    Each time the recipient loads the push URL, Password Pusher calls `check_limits`:
+
+    ```ruby
+    # app/models/push.rb
+    def check_limits
+      expire if !expired? && (!days_remaining.positive? || !views_remaining.positive?)
+    end
+    ```
+
+    If the push is still live, the secret is decrypted and shown. A `view` audit log entry is created. The `view_count` counter increments.
+
+    If the push has already crossed a limit, `expire` is called and the recipient sees an expired page instead.
+  </Step>
+  <Step title="Expiration">
+    Expiration is triggered by whichever limit is reached first — views or days. The `expire` method destroys all secret content and marks the record:
+
+    ```ruby
+    # app/models/push.rb
+    def expire
+      self.payload = nil
+      self.passphrase = nil
+      files.purge
+
+      self.expired = true
+      self.expired_on = Time.current.utc
+      save
+    end
+    ```
+
+    The push record itself is retained so that late visitors see a meaningful "this link has expired" page rather than a 404.
+  </Step>
+  <Step title="Permanent deletion (optional)">
+    If `PWP__PURGE_AFTER` is set, expired push records are purged from the database entirely after the specified interval. By default this is disabled (`purge_after: "disabled"`).
+  </Step>
+</Steps>
+
+## Encryption
+
+Secrets are stored encrypted at rest using the [lockbox](https://github.com/ankane/lockbox) gem. The `has_encrypted` declaration in the Push model covers three fields:
+
+```ruby
+# app/models/push.rb
+has_encrypted :payload, :note, :passphrase
+```
+
+Each encrypted field is stored in a corresponding `_ciphertext` column (`payload_ciphertext`, `note_ciphertext`, `passphrase_ciphertext`). The plaintext values are never written to the database.
+
+The encryption key is derived from `PWPUSH_MASTER_KEY`. For self-hosted deployments, generate your own key at [us.pwpush.com/generate_key](https://us.pwpush.com/generate_key) and set it in the environment before creating any pushes.
+
+<Warning>
+  If `PWPUSH_MASTER_KEY` is not set, a built-in default key is used. This is acceptable for local evaluation but means anyone with access to the image knows the key. Always set your own key for production deployments.
+</Warning>
+
+## Expiration mechanics
+
+Each push has two independent expiration counters. The first to trigger wins.
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| Expire after N views | `PWP__PW__EXPIRE_AFTER_VIEWS_DEFAULT` | 5 |
+| Expire after N days | `PWP__PW__EXPIRE_AFTER_DAYS_DEFAULT` | 7 |
+
+The remaining values are computed on demand:
+
+```ruby
+# app/models/push.rb
+def days_remaining
+  [(expire_after_days - days_old), 0].max
+end
+
+def views_remaining
+  [(expire_after_views - view_count), 0].max
+end
+
+def view_count
+  audit_logs.where(kind: %i[view failed_view]).size
+end
+```
+
+Both `days_remaining` and `views_remaining` floor at zero — they never go negative. `check_limits` fires on every push retrieval and expires the push as soon as either value reaches zero.
+
+<Info>
+  File, URL, and QR push types each have their own configurable defaults (`PWP__FILES__*`, `PWP__URL__*`, `PWP__QR__*`) independent of text/password pushes (`PWP__PW__*`).
+</Info>
+
+## Audit logging
+
+Every interaction with a push is recorded in the `audit_logs` table. The `AuditLog` model defines eight event kinds:
+
+```ruby
+# app/models/audit_log.rb
+enum :kind, [:creation, :view, :failed_view, :expire,
+             :failed_passphrase, :admin_view, :owner_view, :edit],
+     validate: true
+```
+
+Each entry links back to the push and optionally to an authenticated user. The `subject_name` method returns the user's email for authenticated events, or an unknown marker for anonymous ones.
+
+Audit logs are ordered ascending by `created_at` and are destroyed with the push record (`dependent: :destroy`).
+
+## Passphrase protection
+
+When a push is created with a passphrase, the passphrase is encrypted and stored alongside the payload. On retrieval:
+
+- The recipient is shown a form asking for the passphrase.
+- If the passphrase is correct, a `view` event is logged and the secret is shown.
+- If the passphrase is wrong, a `failed_passphrase` event is logged and the secret remains hidden.
+
+The passphrase is cleared along with the payload when the push expires:
+
+```ruby
+def expire
+  self.payload = nil
+  self.passphrase = nil  # passphrase also purged
+  files.purge
+  # ...
+end
+```
+
+## Anonymous vs. authenticated usage
+
+<AccordionGroup>
+  <Accordion title="Anonymous usage">
+    When `PWP__ALLOW_ANONYMOUS` is `true` (the default), anyone can create a push without an account. Anonymous pushes have no `user_id` — the `belongs_to :user` association is optional:
+
+    ```ruby
+    # app/models/push.rb
+    belongs_to :user, optional: true
+    ```
+
+    Anonymous creators have no way to view the audit log after creation and cannot delete the push before it expires naturally (unless "deletable by viewer" is enabled).
+  </Accordion>
+  <Accordion title="Authenticated usage">
+    Authenticated users get a dashboard listing all their pushes with status, view counts, and days remaining. Each push's detail page shows the full audit log: timestamp, IP address, user agent, and referrer for every view event.
+
+    Authenticated users can also delete a push early, which triggers the same `expire` flow as a natural expiration.
+  </Accordion>
+</AccordionGroup>
+
+## URL token generation
+
+Each push gets a unique, URL-safe token generated at creation time:
+
+```ruby
+# app/models/push.rb
+def set_url_token
+  self.url_token = SecureRandom.urlsafe_base64(rand(8..14)).downcase
+end
+```
+
+`SecureRandom.urlsafe_base64` produces a Base64url-encoded random string. The length is randomized between 8 and 14 bytes of entropy, producing tokens between roughly 11 and 19 characters. The result is downcased for readability.
+
+The token is validated for uniqueness before save. It is used as the `to_param` override, so push URLs take the form `/p/:url_token` rather than `/p/:id`.
+
+## API lifecycle example
+
+The following shows a complete push lifecycle through the JSON API:
+
+```bash
+# 1. Create a push
+curl -X POST https://pwpush.example.com/p.json \
+  -H "Content-Type: application/json" \
+  -d '{
+    "password": {
+      "payload": "correct-horse-battery-staple",
+      "expire_after_views": 3,
+      "expire_after_days": 2
+    }
+  }'
+```
+
+```json
+{
+  "url_token": "xk8mabcdefgh",
+  "expired": false,
+  "expire_after_views": 3,
+  "expire_after_days": 2,
+  "days_remaining": 2,
+  "views_remaining": 3,
+  "created_at": "2026-04-02T10:00:00.000Z",
+  "updated_at": "2026-04-02T10:00:00.000Z"
+}
+```
+
+```bash
+# 2. Retrieve the push (view 1 of 3)
+curl https://pwpush.example.com/p/xk8mabcdefgh.json
+```
+
+```json
+{
+  "url_token": "xk8mabcdefgh",
+  "payload": "correct-horse-battery-staple",
+  "expired": false,
+  "views_remaining": 2,
+  "days_remaining": 2
+}
+```
+
+```bash
+# 3. Retrieve two more times — on the third view the push expires
+curl https://pwpush.example.com/p/xk8mabcdefgh.json
+# views_remaining: 0 — push is now expired, payload wiped
+
+# 4. Any subsequent request returns an expired response
+curl https://pwpush.example.com/p/xk8mabcdefgh.json
+```
+
+```json
+{
+  "url_token": "xk8mabcdefgh",
+  "expired": true,
+  "expired_on": "2026-04-02T10:02:13.000Z",
+  "views_remaining": 0,
+  "days_remaining": 0
+}
+```
+
+<Note>
+  The `payload` field is only present in the response when the push is live and not yet expired. Once `expired` is `true`, the field is absent — the plaintext no longer exists in the database.
+</Note>

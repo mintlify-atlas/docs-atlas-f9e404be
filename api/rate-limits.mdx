@@ -1,0 +1,132 @@
+---
+title: 'Rate limits'
+description: 'Understanding and working with Password Pusher API rate limits.'
+---
+
+Password Pusher uses [Rack::Attack](https://github.com/rack/rack-attack) to throttle incoming requests. Rate limiting is applied per IP address.
+
+## Default limits
+
+| Window | Limit | Config key | Environment variable |
+|---|---|---|---|
+| Per minute | 120 requests | `throttling.minute` | `PWP__THROTTLING__MINUTE` |
+| Per second | 60 requests | `throttling.second` | `PWP__THROTTLING__SECOND` |
+
+Both limits apply simultaneously. If you exceed either limit, subsequent requests from your IP will be rejected until the window resets.
+
+<Note>
+  These are the defaults for self-hosted instances. The hosted service at [pwpush.com](https://pwpush.com) may enforce different limits.
+</Note>
+
+## Rate limit response
+
+When you exceed a rate limit, the API returns an HTTP `429 Too Many Requests` response. A `Retry-After` header is included in the response to indicate how many seconds to wait before retrying.
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 1
+```
+
+## Best practices
+
+<AccordionGroup>
+  <Accordion title="Respect the Retry-After header">
+    When you receive a `429` response, read the `Retry-After` header and wait at least that many seconds before sending another request. This avoids hammering the server and getting blocked for longer.
+
+    ```python
+    import requests
+    import time
+
+    def push_secret(payload, email, token):
+        response = requests.post(
+            "https://pwpush.com/p.json",
+            headers={
+                "X-User-Email": email,
+                "X-User-Token": token,
+                "Content-Type": "application/json",
+            },
+            json={"password": {"payload": payload}},
+        )
+        if response.status_code == 429:
+            retry_after = int(response.headers.get("Retry-After", 1))
+            time.sleep(retry_after)
+            return push_secret(payload, email, token)
+        return response.json()
+    ```
+  </Accordion>
+
+  <Accordion title="Implement exponential backoff">
+    For batch operations, use exponential backoff with jitter rather than a fixed delay. This spreads retries out and avoids synchronized thundering-herd retries from multiple clients.
+
+    ```python
+    import requests
+    import time
+    import random
+
+    def push_with_backoff(payload, email, token, max_retries=5):
+        for attempt in range(max_retries):
+            response = requests.post(
+                "https://pwpush.com/p.json",
+                headers={
+                    "X-User-Email": email,
+                    "X-User-Token": token,
+                    "Content-Type": "application/json",
+                },
+                json={"password": {"payload": payload}},
+            )
+            if response.status_code != 429:
+                return response.json()
+
+            wait = (2 ** attempt) + random.uniform(0, 1)
+            time.sleep(wait)
+
+        raise Exception("Max retries exceeded")
+    ```
+  </Accordion>
+
+  <Accordion title="Add delays in batch loops">
+    If you are creating many pushes in a loop, add a small sleep between requests to stay well within the per-second limit.
+
+    ```bash
+    for secret in "${secrets[@]}"; do
+      curl -s -X POST \
+        -H "X-User-Email: user@example.com" \
+        -H "X-User-Token: MyAPIToken" \
+        -H "Content-Type: application/json" \
+        -d "{\"password\": {\"payload\": \"$secret\"}}" \
+        https://pwpush.com/p.json
+      sleep 0.1
+    done
+    ```
+  </Accordion>
+
+  <Accordion title="Cache responses where possible">
+    Avoid fetching the same push URL repeatedly. Store the `url_token` or `html_url` from the creation response and reuse it rather than making additional API calls.
+  </Accordion>
+</AccordionGroup>
+
+## Configuring limits on self-hosted instances
+
+If you operate your own Password Pusher instance, you can adjust the throttling limits via environment variables or `config/settings.yml`.
+
+<Tabs>
+  <Tab title="Environment variables">
+    ```bash
+    PWP__THROTTLING__MINUTE=120
+    PWP__THROTTLING__SECOND=60
+    ```
+  </Tab>
+  <Tab title="settings.yml">
+    ```yaml
+    throttling:
+      minute: 120
+      second: 60
+    ```
+  </Tab>
+</Tabs>
+
+Setting a value to `0` or removing the key disables that throttle entirely. Rate limiting is disabled in the test environment regardless of configuration.
+
+<Warning>
+  The hosted service at pwpush.com manages its own rate limits independently of these configuration values. Do not rely on the defaults above when integrating against pwpush.com.
+</Warning>

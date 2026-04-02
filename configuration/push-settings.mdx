@@ -1,0 +1,362 @@
+---
+title: 'Push settings'
+description: 'Per-kind expiration limits, retrieval steps, deletion controls, blur, file upload limits, and password generator defaults.'
+---
+
+Each push kind (passwords, URLs, files, QR codes, and the password generator) has its own block in `settings.yml` and a corresponding set of `PWP__<KIND>__*` environment variables.
+
+<Tabs>
+  <Tab title="Passwords (pw)">
+
+## Password push settings
+
+Settings under the `pw:` block control behavior for password/text secret pushes.
+
+### Expiration: days
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (days) | `pw.expire_after_days_default` | `PWP__PW__EXPIRE_AFTER_DAYS_DEFAULT` | `7` |
+| Minimum expiry (days) | `pw.expire_after_days_min` | `PWP__PW__EXPIRE_AFTER_DAYS_MIN` | `1` |
+| Maximum expiry (days) | `pw.expire_after_days_max` | `PWP__PW__EXPIRE_AFTER_DAYS_MAX` | `90` |
+
+### Expiration: views
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (views) | `pw.expire_after_views_default` | `PWP__PW__EXPIRE_AFTER_VIEWS_DEFAULT` | `5` |
+| Minimum expiry (views) | `pw.expire_after_views_min` | `PWP__PW__EXPIRE_AFTER_VIEWS_MIN` | `1` |
+| Maximum expiry (views) | `pw.expire_after_views_max` | `PWP__PW__EXPIRE_AFTER_VIEWS_MAX` | `100` |
+
+### Retrieval step
+
+A 1-click intermediate page before the secret is shown, giving recipients a chance to prepare before the view count is consumed.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `pw.enable_retrieval_step` | `PWP__PW__ENABLE_RETRIEVAL_STEP` | `true` |
+| Default form value | `pw.retrieval_step_default` | `PWP__PW__RETRIEVAL_STEP_DEFAULT` | `true` |
+
+When `retrieval_step_default` is `true`, secret URLs are generated as `/p/xxxxxxxx/r`, which shows an intermediate click-through page before revealing `/p/xxxxxxxx`.
+
+### Deletable pushes
+
+Allows recipients to immediately delete a push before it expires.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `pw.enable_deletable_pushes` | `PWP__PW__ENABLE_DELETABLE_PUSHES` | `true` |
+| Default form value | `pw.deletable_pushes_default` | `PWP__PW__DELETABLE_PUSHES_DEFAULT` | `true` |
+
+### Blur
+
+Displays the pushed secret as blurred text in the web UI. Recipients can reveal it with a single mouse click. This setting has no effect on the JSON API.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `pw.enable_blur` | `PWP__PW__ENABLE_BLUR` | `true` |
+
+### Full example
+
+```yaml settings.yml
+pw:
+  expire_after_days_default: 7
+  expire_after_days_min: 1
+  expire_after_days_max: 90
+  expire_after_views_default: 5
+  expire_after_views_min: 1
+  expire_after_views_max: 100
+  enable_retrieval_step: true
+  retrieval_step_default: true
+  enable_deletable_pushes: true
+  deletable_pushes_default: true
+  enable_blur: true
+```
+
+```bash environment variables
+PWP__PW__EXPIRE_AFTER_DAYS_DEFAULT=7
+PWP__PW__EXPIRE_AFTER_DAYS_MIN=1
+PWP__PW__EXPIRE_AFTER_DAYS_MAX=90
+PWP__PW__EXPIRE_AFTER_VIEWS_DEFAULT=5
+PWP__PW__EXPIRE_AFTER_VIEWS_MIN=1
+PWP__PW__EXPIRE_AFTER_VIEWS_MAX=100
+PWP__PW__ENABLE_RETRIEVAL_STEP='true'
+PWP__PW__RETRIEVAL_STEP_DEFAULT='true'
+PWP__PW__ENABLE_DELETABLE_PUSHES='true'
+PWP__PW__DELETABLE_PUSHES_DEFAULT='true'
+PWP__PW__ENABLE_BLUR='true'
+```
+
+  </Tab>
+  <Tab title="URLs (url)">
+
+## URL push settings
+
+Settings under the `url:` block control behavior for URL pushes. Enable URL pushes at the top level with `PWP__ENABLE_URL_PUSHES`.
+
+### Expiration: days
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (days) | `url.expire_after_days_default` | `PWP__URL__EXPIRE_AFTER_DAYS_DEFAULT` | `7` |
+| Minimum expiry (days) | `url.expire_after_days_min` | `PWP__URL__EXPIRE_AFTER_DAYS_MIN` | `1` |
+| Maximum expiry (days) | `url.expire_after_days_max` | `PWP__URL__EXPIRE_AFTER_DAYS_MAX` | `90` |
+
+### Expiration: views
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (views) | `url.expire_after_views_default` | `PWP__URL__EXPIRE_AFTER_VIEWS_DEFAULT` | `5` |
+| Minimum expiry (views) | `url.expire_after_views_min` | `PWP__URL__EXPIRE_AFTER_VIEWS_MIN` | `1` |
+| Maximum expiry (views) | `url.expire_after_views_max` | `PWP__URL__EXPIRE_AFTER_VIEWS_MAX` | `100` |
+
+### Retrieval step
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `url.enable_retrieval_step` | `PWP__URL__ENABLE_RETRIEVAL_STEP` | `true` |
+| Default form value | `url.retrieval_step_default` | `PWP__URL__RETRIEVAL_STEP_DEFAULT` | `true` |
+
+When `retrieval_step_default` is `true`, secret URLs are generated as `/r/xxxxxxxx/r`.
+
+### Full example
+
+```yaml settings.yml
+url:
+  expire_after_days_default: 7
+  expire_after_days_min: 1
+  expire_after_days_max: 90
+  expire_after_views_default: 5
+  expire_after_views_min: 1
+  expire_after_views_max: 100
+  enable_retrieval_step: true
+  retrieval_step_default: true
+```
+
+```bash environment variables
+PWP__URL__EXPIRE_AFTER_DAYS_DEFAULT=7
+PWP__URL__EXPIRE_AFTER_DAYS_MIN=1
+PWP__URL__EXPIRE_AFTER_DAYS_MAX=90
+PWP__URL__EXPIRE_AFTER_VIEWS_DEFAULT=5
+PWP__URL__EXPIRE_AFTER_VIEWS_MIN=1
+PWP__URL__EXPIRE_AFTER_VIEWS_MAX=100
+PWP__URL__ENABLE_RETRIEVAL_STEP='true'
+PWP__URL__RETRIEVAL_STEP_DEFAULT='true'
+```
+
+  </Tab>
+  <Tab title="Files (files)">
+
+## File push settings
+
+Settings under the `files:` block control behavior for file pushes. Enable file pushes at the top level with `PWP__ENABLE_FILE_PUSHES`.
+
+### Expiration: days
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (days) | `files.expire_after_days_default` | `PWP__FILES__EXPIRE_AFTER_DAYS_DEFAULT` | `7` |
+| Minimum expiry (days) | `files.expire_after_days_min` | `PWP__FILES__EXPIRE_AFTER_DAYS_MIN` | `1` |
+| Maximum expiry (days) | `files.expire_after_days_max` | `PWP__FILES__EXPIRE_AFTER_DAYS_MAX` | `90` |
+
+### Expiration: views
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (views) | `files.expire_after_views_default` | `PWP__FILES__EXPIRE_AFTER_VIEWS_DEFAULT` | `5` |
+| Minimum expiry (views) | `files.expire_after_views_min` | `PWP__FILES__EXPIRE_AFTER_VIEWS_MIN` | `1` |
+| Maximum expiry (views) | `files.expire_after_views_max` | `PWP__FILES__EXPIRE_AFTER_VIEWS_MAX` | `100` |
+
+### Retrieval step
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `files.enable_retrieval_step` | `PWP__FILES__ENABLE_RETRIEVAL_STEP` | `true` |
+| Default form value | `files.retrieval_step_default` | `PWP__FILES__RETRIEVAL_STEP_DEFAULT` | `true` |
+
+When `retrieval_step_default` is `true`, secret URLs are generated as `/f/xxxxxxxx/r`.
+
+### Deletable pushes
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `files.enable_deletable_pushes` | `PWP__FILES__ENABLE_DELETABLE_PUSHES` | `true` |
+| Default form value | `files.deletable_pushes_default` | `PWP__FILES__DELETABLE_PUSHES_DEFAULT` | `true` |
+
+### Blur
+
+Displays the file push metadata as blurred in the web UI. No effect on the JSON API.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `files.enable_blur` | `PWP__FILES__BLUR` | `true` |
+
+### Upload limits
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Max files per push | `files.max_file_uploads` | `PWP__FILES__MAX_FILE_UPLOADS` | `10` |
+
+### Storage backend
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Backend | `files.storage` | `PWP__FILES__STORAGE` | `'local'` |
+
+Valid values: `local`, `amazon`, `minio`, `google`, `microsoft`. See [File storage](/configuration/file-storage) for full backend configuration.
+
+### Full example
+
+```yaml settings.yml
+files:
+  expire_after_days_default: 7
+  expire_after_days_min: 1
+  expire_after_days_max: 90
+  expire_after_views_default: 5
+  expire_after_views_min: 1
+  expire_after_views_max: 100
+  enable_retrieval_step: true
+  retrieval_step_default: true
+  enable_deletable_pushes: true
+  deletable_pushes_default: true
+  enable_blur: true
+  max_file_uploads: 10
+  storage: 'local'
+```
+
+```bash environment variables
+PWP__FILES__EXPIRE_AFTER_DAYS_DEFAULT=7
+PWP__FILES__EXPIRE_AFTER_VIEWS_DEFAULT=5
+PWP__FILES__ENABLE_RETRIEVAL_STEP='true'
+PWP__FILES__RETRIEVAL_STEP_DEFAULT='true'
+PWP__FILES__ENABLE_DELETABLE_PUSHES='true'
+PWP__FILES__DELETABLE_PUSHES_DEFAULT='true'
+PWP__FILES__BLUR='true'
+PWP__FILES__MAX_FILE_UPLOADS=10
+PWP__FILES__STORAGE='amazon'
+```
+
+  </Tab>
+  <Tab title="QR codes (qr)">
+
+## QR code push settings
+
+Settings under the `qr:` block control behavior for QR code pushes. Enable QR pushes at the top level with `PWP__ENABLE_QR_PUSHES`.
+
+### Expiration: days
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (days) | `qr.expire_after_days_default` | `PWP__QR__EXPIRE_AFTER_DAYS_DEFAULT` | `7` |
+| Minimum expiry (days) | `qr.expire_after_days_min` | `PWP__QR__EXPIRE_AFTER_DAYS_MIN` | `1` |
+| Maximum expiry (days) | `qr.expire_after_days_max` | `PWP__QR__EXPIRE_AFTER_DAYS_MAX` | `90` |
+
+### Expiration: views
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Default expiry (views) | `qr.expire_after_views_default` | `PWP__QR__EXPIRE_AFTER_VIEWS_DEFAULT` | `5` |
+| Minimum expiry (views) | `qr.expire_after_views_min` | `PWP__QR__EXPIRE_AFTER_VIEWS_MIN` | `1` |
+| Maximum expiry (views) | `qr.expire_after_views_max` | `PWP__QR__EXPIRE_AFTER_VIEWS_MAX` | `100` |
+
+### Retrieval step
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `qr.enable_retrieval_step` | `PWP__QR__ENABLE_RETRIEVAL_STEP` | `true` |
+| Default form value | `qr.retrieval_step_default` | `PWP__QR__RETRIEVAL_STEP_DEFAULT` | `true` |
+
+### Deletable pushes
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Feature enabled | `qr.enable_deletable_pushes` | `PWP__QR__ENABLE_DELETABLE_PUSHES` | `true` |
+| Default form value | `qr.deletable_pushes_default` | `PWP__QR__DELETABLE_PUSHES_DEFAULT` | `true` |
+
+### Full example
+
+```yaml settings.yml
+qr:
+  expire_after_days_default: 7
+  expire_after_days_min: 1
+  expire_after_days_max: 90
+  expire_after_views_default: 5
+  expire_after_views_min: 1
+  expire_after_views_max: 100
+  enable_retrieval_step: true
+  retrieval_step_default: true
+  enable_deletable_pushes: true
+  deletable_pushes_default: true
+```
+
+```bash environment variables
+PWP__QR__EXPIRE_AFTER_DAYS_DEFAULT=7
+PWP__QR__EXPIRE_AFTER_VIEWS_DEFAULT=5
+PWP__QR__ENABLE_RETRIEVAL_STEP='true'
+PWP__QR__RETRIEVAL_STEP_DEFAULT='true'
+PWP__QR__ENABLE_DELETABLE_PUSHES='true'
+PWP__QR__DELETABLE_PUSHES_DEFAULT='true'
+```
+
+  </Tab>
+  <Tab title="Generator (gen)">
+
+## Password generator settings
+
+Settings under the `gen:` block control the on-screen password generator defaults on the front page.
+
+### Composition toggles
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Include numbers | `gen.has_numbers` | `PWP__GEN__HAS_NUMBERS` | `true` |
+| Title case | `gen.title_cased` | `PWP__GEN__TITLE_CASED` | `true` |
+| Use separators | `gen.use_separators` | `PWP__GEN__USE_SEPARATORS` | `true` |
+
+### Character sets
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Consonants | `gen.consonants` | `PWP__GEN__CONSONANTS` | `'bcdfghklmnprstvz'` |
+| Vowels | `gen.vowels` | `PWP__GEN__VOWELS` | `'aeiouy'` |
+| Separators | `gen.separators` | `PWP__GEN__SEPARATORS` | `'-_='` |
+
+`separators` is only used when `use_separators` is `true`. A separator is chosen at random from this string for each syllable boundary.
+
+### Syllable length
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Maximum syllable length | `gen.max_syllable_length` | `PWP__GEN__MAX_SYLLABLE_LENGTH` | `3` |
+| Minimum syllable length | `gen.min_syllable_length` | `PWP__GEN__MIN_SYLLABLE_LENGTH` | `1` |
+| Number of syllables | `gen.syllables_count` | `PWP__GEN__SYLLABLES_COUNT` | `3` |
+
+### Full example
+
+```yaml settings.yml
+gen:
+  has_numbers: true
+  title_cased: true
+  use_separators: true
+  consonants: 'bcdfghklmnprstvz'
+  vowels: 'aeiouy'
+  separators: '-_='
+  max_syllable_length: 3
+  min_syllable_length: 1
+  syllables_count: 3
+```
+
+```bash environment variables
+PWP__GEN__HAS_NUMBERS='true'
+PWP__GEN__TITLE_CASED='true'
+PWP__GEN__USE_SEPARATORS='true'
+PWP__GEN__CONSONANTS='bcdfghklmnprstvz'
+PWP__GEN__VOWELS='aeiouy'
+PWP__GEN__SEPARATORS='-_='
+PWP__GEN__MAX_SYLLABLE_LENGTH=3
+PWP__GEN__MIN_SYLLABLE_LENGTH=1
+PWP__GEN__SYLLABLES_COUNT=3
+```
+
+  </Tab>
+</Tabs>

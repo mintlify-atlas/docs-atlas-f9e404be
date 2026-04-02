@@ -1,0 +1,123 @@
+---
+title: 'Audit logs'
+description: 'Every view, failed attempt, and expiration event is recorded in a per-push audit log visible to the push owner.'
+---
+
+Password Pusher automatically records an audit log entry for every significant event on a push. As the push creator you can review who accessed a push, when, and from where — directly in the dashboard or via the API.
+
+---
+
+## What is logged
+
+Each of the following events creates an audit log entry:
+
+| Event | Description |
+|-------|-------------|
+| `creation` | The push was created. |
+| `view` | A recipient successfully viewed the payload. |
+| `failed_view` | A view attempt was made on an already-expired push. |
+| `failed_passphrase` | A passphrase was submitted but was incorrect. |
+| `expire` | The push was expired (by time/view limit or manual deletion). |
+| `owner_view` | The push owner viewed the push from the dashboard. |
+| `admin_view` | An administrator viewed the push. |
+| `edit` | The push was edited by its owner. |
+
+---
+
+## Data captured per event
+
+Each audit log entry records:
+
+- **IP address** of the requester
+- **User agent** (browser or API client string)
+- **Referrer** URL, if present in the request
+- **Timestamp** (UTC) of the event
+- **Event kind** (from the list above)
+- **User** email, if the request was made by an authenticated user
+
+<Warning>
+Audit logs can contain IP addresses and browser fingerprints. Treat this data according to your organization's privacy policy and applicable regulations (e.g., GDPR).
+</Warning>
+
+---
+
+## Viewing audit logs
+
+### In the dashboard
+
+Log in and navigate to your push list. Each push has a link to its audit log, which displays a chronological table of all recorded events. Anonymous pushes (created without an account) do not have an owner and therefore do not appear in the dashboard.
+
+<Note>
+You must be logged in as the push owner to view the audit log. There is no audit log access for anonymous pushes.
+</Note>
+
+### Via the API
+
+Retrieve the audit log for a push you own:
+
+```bash
+GET /p/:url_token/audit.json
+```
+
+Requires authentication (Bearer token or session cookie). The response is a JSON array of audit log entries, ordered by creation time ascending.
+
+<CodeGroup>
+
+```bash cURL
+curl -H "Authorization: Bearer <your-token>" \
+  https://pwpush.com/p/abc123xyz/audit.json
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://pwpush.com/p/abc123xyz/audit.json",
+    headers={"Authorization": "Bearer <your-token>"}
+)
+print(resp.json())
+```
+
+</CodeGroup>
+
+---
+
+## View counts
+
+The dashboard and API response both report:
+
+- **Successful views** — how many times the payload was shown
+- **Failed views** — how many attempts were made on an already-expired push
+- **Views remaining** — how many views are left before expiry
+
+These counts are derived from the audit log. The `view_count` method sums all `view` and `failed_view` events.
+
+---
+
+## Privacy considerations
+
+<AccordionGroup>
+  <Accordion title="Anonymous pushes">
+    Pushes created without a user account have no owner. Audit logs are still recorded internally, but there is no dashboard or API endpoint through which an anonymous creator can retrieve them.
+  </Accordion>
+  <Accordion title="IP address retention">
+    Audit logs store the requester's IP address for every event. If you operate a public-facing instance, inform users that access is logged. You can limit retention with the `purge_after` setting.
+  </Accordion>
+  <Accordion title="Purging audit logs">
+    Audit logs are permanently deleted when their parent push is purged. Configure automatic purging with the `PWP__PURGE_AFTER` environment variable. Once purged, the data cannot be recovered.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Purging push metadata and audit logs
+
+Audit logs persist as long as the push record exists. To automatically delete expired push records — and their audit logs — after a defined period:
+
+```bash
+PWP__PURGE_AFTER='6 months'
+```
+
+Accepted values: `disabled` (default), `3 months`, `6 months`, `1 year`, `2 years`, `3 years`.
+
+See [Expiration](/features/expiration) for more detail on the purge lifecycle.

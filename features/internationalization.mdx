@@ -1,0 +1,119 @@
+---
+title: 'Internationalization'
+description: 'Password Pusher is available in 33 languages. Language is detected automatically from the browser or selected via the URL prefix.'
+---
+
+Password Pusher ships with translations for 33 languages out of the box. Both the push creation UI and the secret retrieval pages are fully translated, so recipients see the application in their preferred language without any extra configuration.
+
+---
+
+## Supported languages
+
+The following languages are enabled by default:
+
+| Code | Language |
+|------|----------|
+| `ca` | Català |
+| `cs` | Čeština |
+| `cy` | Cymraeg |
+| `da` | Dansk |
+| `de` | Deutsch |
+| `en` | English |
+| `en-GB` | English (UK) |
+| `es` | Español |
+| `eu` | Euskara |
+| `fi` | Suomi |
+| `fr` | Français |
+| `ga` | Gaeilge |
+| `hi` | हिन्दी |
+| `hu` | Magyar |
+| `id` | Indonesian |
+| `is` | Íslenska |
+| `it` | Italiano |
+| `ja` | 日本語 |
+| `ko` | 한국어 |
+| `lv` | Latviski |
+| `nl` | Nederlands |
+| `no` | Norsk |
+| `pl` | Polski |
+| `pt-BR` | Português (Brazil) |
+| `pt-PT` | Português (Portugal) |
+| `ro` | Română |
+| `ru` | Русский |
+| `sk` | Slovenský |
+| `sr` | Српски |
+| `sv` | Svenska |
+| `th` | ไทย |
+| `uk` | Українська |
+| `ur` | اردو |
+| `zh-CN` | 中文 |
+
+---
+
+## Language detection
+
+Password Pusher determines the active locale using this order of precedence:
+
+1. **URL prefix** — if the URL includes a locale prefix (e.g., `/fr/p/new`), that locale is used.
+2. **Browser `Accept-Language` header** — if no URL prefix is present, the browser's preferred language is matched against the enabled language list.
+3. **Instance default** — if neither of the above matches, the configured default locale is used.
+
+---
+
+## URL-based language selection
+
+Prepend any locale code to standard paths to force a specific language:
+
+```
+https://pwpush.com/fr/p/new       # New push form in French
+https://pwpush.com/de/p/abc123    # Retrieve push in German
+https://pwpush.com/ja/p/abc123/r  # Retrieval step in Japanese
+```
+
+Secret URLs share the locale with the creation context. A push created while browsing in French will serve its retrieval page in French to the recipient.
+
+---
+
+## Setting the default locale
+
+Set the instance-wide default language with:
+
+```bash
+PWP__DEFAULT_LOCALE='fr'
+```
+
+Or in `config/settings.yml`:
+
+```yaml
+default_locale: :fr
+```
+
+<Note>
+The default locale must be present in the `enabled_language_codes` list. Setting a locale that is not enabled will cause an error on boot.
+</Note>
+
+---
+
+## Restricting available languages
+
+To limit which languages are available on your instance, edit `enabled_language_codes` in `config/settings.yml`:
+
+```yaml
+enabled_language_codes:
+  - en
+  - de
+  - fr
+  - es
+```
+
+Remove any language code from the list to hide it from the UI and prevent it from being selected via the URL prefix.
+
+<Warning>
+If you remove the default locale from `enabled_language_codes`, the application will fail to start. Always keep the default locale in the enabled list.
+</Warning>
+
+---
+
+## Contributing translations
+
+Translations are managed through **Translation.io**, which provides a free tier for open source projects. If you find a missing or incorrect translation, contributions are welcome via the [Password Pusher GitHub repository](https://github.com/pglombardo/PasswordPusher).

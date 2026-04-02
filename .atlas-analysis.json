@@ -1,24 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Password Pusher",
+  "projectType": "saas",
+  "projectName": "Password Pusher",
+  "projectDescription": "An open source web app for securely sharing passwords, text, files, and URLs via self-deleting one-time links with full audit logs.",
   "theme": "almond",
-  "colors": {
-    "primary": "#ef1804",
-    "light": "#8c1c1c",
-    "dark": "#1d1c33"
-  },
-  "favicon": "https://media.brand.dev/5e1a6898-5db8-4c62-8ff4-11eefa20c97d.png",
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/pglombardo/PasswordPusher"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/pglombardo/PasswordPusher"
-    }
-  },
+  "primaryColor": "#ef1804",
+  "lightColor": "#8c1c1c",
+  "darkColor": "#1d1c33",
   "navigation": {
     "tabs": [
       {
@@ -92,5 +79,29 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "One-time secret links that self-delete after a set number of views or days",
+    "Support for text/password pushes, file uploads, URL redirects, and QR codes",
+    "Full audit log tracking views, IP addresses, user agents, and timestamps",
+    "Passphrase protection for additional security on shared secrets",
+    "Two-factor authentication (TOTP) for user accounts",
+    "JSON REST API for programmatic access and automation",
+    "31-language internationalization for the web UI",
+    "Docker, Kubernetes, and Helm deployment support",
+    "White-label customization with 26 Bootswatch themes and custom branding",
+    "Encrypted at-rest storage with automatic deletion of expired content"
+  ],
+  "publicApiSurface": [
+    "POST /p.json — Create a text/password push",
+    "GET /p/:url_token.json — Retrieve a push (counts as a view)",
+    "DELETE /p/:url_token.json — Expire a push immediately",
+    "GET /p/:url_token/preview.json — Get the secret URL without counting a view",
+    "GET /p/:url_token/audit.json — Retrieve the audit log for a push",
+    "GET /p/active.json — List active pushes for authenticated user",
+    "GET /p/expired.json — List expired pushes for authenticated user",
+    "POST /f.json — Create a file push",
+    "POST /r.json — Create a URL redirect push",
+    "GET /api/v1/version — Get the API version"
+  ]
 }

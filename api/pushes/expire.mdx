@@ -1,0 +1,153 @@
+---
+title: 'Expire a push'
+description: 'Immediately expire a push, deleting its payload and invalidating the secret URL.'
+---
+
+Expiring a push deletes its payload, passphrase, and any attached files, then marks the push as expired. The push record itself is retained for audit purposes, but the secret content is gone.
+
+## Endpoint
+
+```
+DELETE /p/:url_token.json
+```
+
+## Authorization
+
+One of the following must be true:
+
+- You are authenticated as the owner of the push.
+- The push was created with `deletable_by_viewer: true`.
+
+If neither condition is met, the API returns `401 Unauthorized`.
+
+<Warning>
+  Expiration is permanent. Once a push is expired, its payload cannot be recovered.
+</Warning>
+
+## Path parameters
+
+<ParamField path="url_token" type="string" required>
+  The unique token of the push to expire.
+</ParamField>
+
+## Response
+
+Returns the push record after expiration. The `expired` field will be `true` and `payload` will be `null`.
+
+<ResponseField name="url_token" type="string">
+  The token of the expired push.
+</ResponseField>
+
+<ResponseField name="expired" type="boolean">
+  `true` after successful expiration.
+</ResponseField>
+
+<ResponseField name="deleted" type="boolean">
+  `true` because expiration via this endpoint is recorded as a delete event in the audit log.
+</ResponseField>
+
+<ResponseField name="expired_on" type="string">
+  ISO 8601 timestamp of when the push was expired.
+</ResponseField>
+
+<ResponseField name="expire_after_days" type="integer">
+  The original days-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="expire_after_views" type="integer">
+  The original views-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="days_remaining" type="integer">
+  `0` after expiration.
+</ResponseField>
+
+<ResponseField name="views_remaining" type="integer">
+  `0` after expiration.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 creation timestamp.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL (authenticated owner)
+curl -X DELETE \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  https://pwpush.com/p/fkwjfvhall92.json
+```
+
+```bash cURL (deletable by viewer)
+curl -X DELETE https://pwpush.com/p/fkwjfvhall92.json
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+    "https://pwpush.com/p/fkwjfvhall92.json",
+    headers={
+        "X-User-Email": "user@example.com",
+        "X-User-Token": "MyAPIToken",
+    },
+)
+print(response.json())
+```
+
+```ruby Ruby
+require "net/http"
+require "json"
+require "uri"
+
+uri = URI("https://pwpush.com/p/fkwjfvhall92.json")
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+
+request = Net::HTTP::Delete.new(uri.path)
+request["X-User-Email"] = "user@example.com"
+request["X-User-Token"] = "MyAPIToken"
+
+response = http.request(request)
+puts JSON.parse(response.body)
+```
+
+</CodeGroup>
+
+### Response example
+
+```json 200 OK
+{
+  "url_token": "fkwjfvhall92",
+  "expired": true,
+  "deleted": true,
+  "expired_on": "2023-10-20T15:32:01Z",
+  "expire_after_days": 7,
+  "expire_after_views": 5,
+  "days_remaining": 0,
+  "views_remaining": 0,
+  "created_at": "2023-10-20T15:32:01Z",
+  "expires_at": "2023-10-27T15:32:01Z"
+}
+```
+
+### Error responses
+
+```json 401 Unauthorized
+{
+  "error": "That push is not deletable by viewers."
+}
+```
+
+```json 404 Not Found
+{
+  "error": "not-found"
+}
+```
+
+<Note>
+  A `404` response is returned for any token that does not match an existing push record — including tokens that never existed. This is intentional: revealing whether a token has ever existed would be an information leak.
+</Note>

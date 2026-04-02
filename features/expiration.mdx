@@ -1,0 +1,138 @@
+---
+title: 'Expiration'
+description: 'Every push has two independent expiry limits — a time limit and a view limit. Whichever is reached first expires the push and permanently deletes its content.'
+---
+
+Expiration is the core safety mechanism of Password Pusher. Once a push expires, its payload is set to `nil`, any attached files are purged, and the push is marked expired. The content is unrecoverable.
+
+---
+
+## Two independent limits
+
+Every push is created with two limits set simultaneously:
+
+<CardGroup cols={2}>
+  <Card title="Days" icon="calendar">
+    The push expires after a fixed number of days from creation, regardless of how many times it has been viewed.
+  </Card>
+  <Card title="Views" icon="eye">
+    The push expires after a fixed number of views, regardless of how much time has passed.
+  </Card>
+</CardGroup>
+
+**First-trigger wins.** Whichever limit is reached first causes the push to expire. A push set to 7 days / 5 views expires after 5 views even if only 2 days have elapsed, and expires after 7 days even if only 3 views have occurred.
+
+---
+
+## Default and allowed ranges
+
+Each push type has independently configurable defaults and min/max ranges. The factory defaults (matching `config/settings.yml`) are:
+
+| Setting | Default | Min | Max |
+|---------|---------|-----|-----|
+| Expire after days | 7 | 1 | 90 |
+| Expire after views | 5 | 1 | 100 |
+
+These defaults apply to text, URL, file, and QR code pushes unless overridden per push type. You can tune the allowed range for each push type using environment variables such as:
+
+```bash
+PWP__PW__EXPIRE_AFTER_DAYS_DEFAULT=7
+PWP__PW__EXPIRE_AFTER_DAYS_MIN=1
+PWP__PW__EXPIRE_AFTER_DAYS_MAX=90
+PWP__PW__EXPIRE_AFTER_VIEWS_DEFAULT=5
+PWP__PW__EXPIRE_AFTER_VIEWS_MIN=1
+PWP__PW__EXPIRE_AFTER_VIEWS_MAX=100
+```
+
+Replace `PW` with `URL`, `FILES`, or `QR` for the other push types.
+
+---
+
+## What happens when a push expires
+
+When either limit is crossed, the push transitions immediately:
+
+1. `payload` is set to `nil` (secret text destroyed)
+2. `passphrase` is set to `nil`
+3. All attached files are purged from storage
+4. `expired` flag is set to `true`
+5. `expired_on` is set to the current UTC timestamp
+
+After expiration, anyone visiting the secret URL sees an "expired" page. No content is ever shown again.
+
+---
+
+## The retrieval step
+
+By default, secret URLs include a `/r` suffix:
+
+```
+https://pwpush.com/p/abc123/r
+```
+
+Opening this URL shows a **preview page** — a one-click confirmation screen — before the actual payload is revealed. Clicking through then loads the real push URL (`/p/abc123`) and counts as a view.
+
+**Why this matters:** Chat apps, email clients, Slack, and security scanners often pre-fetch URLs in messages to generate link previews. Without the retrieval step, those automated fetches consume view counts before a human ever sees the secret. The retrieval step prevents this.
+
+<Tabs>
+  <Tab title="With retrieval step (default)">
+    ```
+    /p/:token/r  →  preview page (no view counted)
+    /p/:token    →  payload shown (view counted)
+    ```
+  </Tab>
+  <Tab title="Without retrieval step">
+    ```
+    /p/:token    →  payload shown immediately (view counted)
+    ```
+  </Tab>
+</Tabs>
+
+The retrieval step can be enabled or disabled globally, and the default form value is configurable:
+
+```bash
+PWP__PW__ENABLE_RETRIEVAL_STEP=true
+PWP__PW__RETRIEVAL_STEP_DEFAULT=true
+```
+
+<Note>
+Each push type (`PW`, `URL`, `FILES`, `QR`) has its own retrieval step setting. The feature can be disabled per push type independently.
+</Note>
+
+---
+
+## Deletable by viewer
+
+When enabled, the recipient sees a **Delete now** button on the push page. Clicking it immediately expires the push — payload, passphrase, and files are all destroyed — before either the day or view limit is reached.
+
+This is useful when:
+
+- You want to confirm the recipient got the secret and destroy it on their end
+- You are sending to someone who may forward the link to others
+
+<Tip>
+"Deletable by viewer" is available for text, file, and QR code pushes. It is not available for URL pushes.
+</Tip>
+
+The feature can be toggled globally and the default form value is configurable:
+
+```bash
+PWP__PW__ENABLE_DELETABLE_PUSHES=true
+PWP__PW__DELETABLE_PUSHES_DEFAULT=true
+```
+
+---
+
+## Purging expired push metadata
+
+By default, expired pushes are kept in the database indefinitely (payload and files already destroyed, only metadata remains). You can configure automatic permanent deletion of the entire push record — including audit logs — after a set period:
+
+```bash
+PWP__PURGE_AFTER='3 months'
+```
+
+Accepted values: `disabled` (default), `3 months`, `6 months`, `1 year`, `2 years`, `3 years`.
+
+<Warning>
+Once purged, push metadata and audit logs are permanently and irretrievably deleted. Set `purge_after` only if you are confident you do not need historical access to audit records.
+</Warning>

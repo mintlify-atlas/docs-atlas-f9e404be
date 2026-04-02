@@ -1,0 +1,234 @@
+---
+title: 'Branding'
+description: 'Customize the site title, tagline, logos, theme, GDPR banner, locale, timezone, and logging behavior.'
+---
+
+## Site identity
+
+### brand.title
+
+The name displayed in the browser tab and site header.
+
+| | |
+|---|---|
+| **YAML key** | `brand.title` |
+| **Env var** | `PWP__BRAND__TITLE` |
+| **Default** | `'Password Pusher'` |
+
+### brand.tagline
+
+A short phrase displayed beneath the site title on the homepage.
+
+| | |
+|---|---|
+| **YAML key** | `brand.tagline` |
+| **Env var** | `PWP__BRAND__TAGLINE` |
+| **Default** | `'Go Ahead.  Email Another Password.'` |
+
+### brand.disclaimer
+
+Optional short text shown centered in the footer in muted style. Leave unset to hide the disclaimer entirely.
+
+| | |
+|---|---|
+| **YAML key** | `brand.disclaimer` |
+| **Env var** | `PWP__BRAND__DISCLAIMER` |
+| **Default** | _(unset)_ |
+
+### brand.show_footer_menu
+
+Controls whether the navigation links are shown in the page footer.
+
+| | |
+|---|---|
+| **YAML key** | `brand.show_footer_menu` |
+| **Env var** | `PWP__BRAND__SHOW_FOOTER_MENU` |
+| **Default** | `true` |
+
+```yaml settings.yml
+brand:
+  title: 'Acme Corp Secrets'
+  tagline: 'Share secrets securely.'
+  disclaimer: 'Use subject to company policy.'
+  show_footer_menu: true
+```
+
+```bash environment variables
+PWP__BRAND__TITLE='Acme Corp Secrets'
+PWP__BRAND__TAGLINE='Share secrets securely.'
+PWP__BRAND__DISCLAIMER='Use subject to company policy.'
+PWP__BRAND__SHOW_FOOTER_MENU='true'
+```
+
+---
+
+## Logos
+
+Custom logos for the light and dark UI themes. Accepts relative file paths (served from the application's asset pipeline) or fully qualified URLs pointing to external resources such as Amazon S3.
+
+### brand.light_logo
+
+Logo displayed when the light theme is active.
+
+| | |
+|---|---|
+| **YAML key** | `brand.light_logo` |
+| **Env var** | `PWP__BRAND__LIGHT_LOGO` |
+| **Default** | _(unset — uses built-in logo)_ |
+
+### brand.dark_logo
+
+Logo displayed when the dark theme is active.
+
+| | |
+|---|---|
+| **YAML key** | `brand.dark_logo` |
+| **Env var** | `PWP__BRAND__DARK_LOGO` |
+| **Default** | _(unset — uses built-in logo)_ |
+
+```yaml settings.yml
+brand:
+  light_logo: 'logo-transparent-sm-bare.png'
+  dark_logo: 'logo-transparent-sm-dark-bare.png'
+```
+
+```bash environment variables (external URLs)
+PWP__BRAND__LIGHT_LOGO='https://mys3bucket.amazonaws.com/a/logo-light.png'
+PWP__BRAND__DARK_LOGO='https://mys3bucket.amazonaws.com/a/logo-dark.png'
+```
+
+---
+
+## Version and GDPR
+
+### show_version
+
+Displays the running Password Pusher version number in the page footer.
+
+| | |
+|---|---|
+| **YAML key** | `show_version` |
+| **Env var** | `PWP__SHOW_VERSION` |
+| **Default** | `true` |
+
+### show_gdpr_consent_banner
+
+Displays a GDPR cookie consent banner to visitors.
+
+| | |
+|---|---|
+| **YAML key** | `show_gdpr_consent_banner` |
+| **Env var** | `PWP__SHOW_GDPR_CONSENT_BANNER` |
+| **Default** | `false` |
+
+```yaml settings.yml
+show_version: true
+show_gdpr_consent_banner: false
+```
+
+```bash environment variables
+PWP__SHOW_VERSION='true'
+PWP__SHOW_GDPR_CONSENT_BANNER='true'
+```
+
+---
+
+## Theme
+
+Password Pusher uses [Bootswatch](https://bootswatch.com/) themes. Set the theme name to any valid Bootswatch theme (e.g., `cerulean`, `darkly`, `flatly`, `lux`, `minty`, `pulse`, `sandstone`, `simplex`, `sketchy`, `slate`, `solar`, `spacelab`, `superhero`, `united`, `yeti`) or `default` for the standard Bootstrap look.
+
+### theme
+
+| | |
+|---|---|
+| **YAML key** | `theme` _(read-only in this file — use the env var)_ |
+| **Env var** | `PWP__THEME` |
+| **Default** | `'default'` |
+
+<Warning>
+  The `theme` setting can only be changed via the `PWP__THEME` environment variable. Editing the value directly in `settings.yml` has no effect. Additionally, when using a custom theme you must also set `PWP_PRECOMPILE='true'` so assets are recompiled on container boot.
+</Warning>
+
+### PWP_PRECOMPILE
+
+Triggers asset precompilation on container startup. Required when `PWP__THEME` is set to a non-default Bootswatch theme.
+
+| | |
+|---|---|
+| **Env var** | `PWP_PRECOMPILE` _(single underscore — env var only)_ |
+| **Default** | `'false'` |
+
+```bash environment variables
+PWP__THEME='darkly'
+PWP_PRECOMPILE='true'
+```
+
+---
+
+## Locale and timezone
+
+### timezone
+
+The IANA timezone used by the application for display and scheduling. See the [tz database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) for valid values.
+
+| | |
+|---|---|
+| **YAML key** | `timezone` |
+| **Env var** | `PWP__TIMEZONE` |
+| **Default** | `'America/New_York'` |
+
+### default_locale
+
+The default language served to visitors. Must be one of the language codes listed in `enabled_language_codes`.
+
+| | |
+|---|---|
+| **YAML key** | `default_locale` |
+| **Env var** | `PWP__DEFAULT_LOCALE` |
+| **Default** | `en` |
+
+```yaml settings.yml
+timezone: 'Europe/Berlin'
+default_locale: :de
+```
+
+```bash environment variables
+PWP__TIMEZONE='Europe/Berlin'
+PWP__DEFAULT_LOCALE='de'
+```
+
+---
+
+## Logging
+
+### log_level
+
+Controls the verbosity of application log output.
+
+| | |
+|---|---|
+| **YAML key** | `log_level` |
+| **Env var** | `PWP__LOG_LEVEL` |
+| **Default** | `:warn` |
+
+Valid values: `:debug`, `:info`, `:warn`, `:error`, `:fatal`.
+
+### log_to_stdout
+
+When `true`, logs are written to standard output instead of `log/production.log`. Recommended for container deployments where stdout is captured by the container runtime.
+
+| | |
+|---|---|
+| **YAML key** | `log_to_stdout` |
+| **Env var** | `PWP__LOG_TO_STDOUT` |
+| **Default** | `true` |
+
+```yaml settings.yml
+log_level: :warn
+log_to_stdout: true
+```
+
+```bash environment variables
+PWP__LOG_LEVEL=':info'
+PWP__LOG_TO_STDOUT='true'
+```

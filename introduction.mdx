@@ -1,0 +1,123 @@
+---
+title: "Introduction"
+description: "Password Pusher is an open source web app for sharing secrets safely — encrypted, self-deleting, and fully auditable."
+---
+
+Password Pusher lets you share passwords, notes, files, and URLs through one-time links that expire automatically. When a link expires — by view count, by time, or both — the secret is permanently deleted from the database. Nothing lingers in chat history or email threads.
+
+Use the [hosted service at pwpush.com](https://pwpush.com) or deploy your own instance in minutes with Docker.
+
+## Push types
+
+Every push you create results in a unique, time-limited URL. Password Pusher supports four kinds:
+
+<CardGroup cols={2}>
+  <Card title="Text / password" icon="key">
+    Share any secret text — passwords, tokens, API keys, notes. Supports an optional built-in password generator. Payload size limit is 1 MB.
+  </Card>
+  <Card title="File" icon="file-arrow-up">
+    Upload one or more files (up to the configured maximum). Files are stored encrypted and purged when the push expires.
+  </Card>
+  <Card title="URL" icon="link">
+    Wrap a URL in a one-time redirect. The recipient is sent to the destination on the first click; subsequent requests see an expired page.
+  </Card>
+  <Card title="QR code" icon="qrcode">
+    Encode any text (up to 1,024 characters) into a QR code image delivered through a self-expiring link.
+  </Card>
+</CardGroup>
+
+<Note>
+  Each push type has independent expiration defaults and limits configurable via environment variables. File, URL, and QR pushes can each be disabled individually on a self-hosted instance.
+</Note>
+
+## Hosted vs. self-hosted
+
+<CardGroup cols={2}>
+  <Card title="Hosted — pwpush.com" icon="cloud" href="https://pwpush.com">
+    No setup required. Visit pwpush.com, create a push, and share the link. The Pro plan adds additional features; the OSS demo runs at oss.pwpush.com.
+  </Card>
+  <Card title="Self-hosted — Docker / Kubernetes" icon="server" href="/deployment/docker">
+    Run Password Pusher on your own infrastructure using Docker Compose, Kubernetes manifests, or Helm. One `docker compose up -d` command is enough to get started.
+  </Card>
+</CardGroup>
+
+Self-hosting gives you full control over data residency, encryption keys, branding, and feature configuration. The Docker image includes automatic Let's Encrypt TLS via the `TLS_DOMAIN` environment variable.
+
+## Security properties
+
+### Encrypted at rest
+
+Sensitive fields — the secret payload, optional passphrase, and note — are stored encrypted in the database using the [lockbox](https://github.com/ankane/lockbox) gem's `has_encrypted` pattern. The ciphertext columns (`payload_ciphertext`, `passphrase_ciphertext`, `note_ciphertext`) are never exposed through the API or UI.
+
+```ruby
+# app/models/push.rb
+has_encrypted :payload, :note, :passphrase
+```
+
+For self-hosted deployments, set `PWPUSH_MASTER_KEY` to your own generated key. Without it, a default key is used — acceptable for evaluation but not recommended for production.
+
+### Automatic deletion
+
+When a push expires, its content is actively destroyed:
+
+```ruby
+# app/models/push.rb
+def expire
+  self.payload = nil
+  self.passphrase = nil
+  files.purge
+
+  self.expired = true
+  self.expired_on = Time.current.utc
+  save
+end
+```
+
+The record remains (to show an "expired" page to late arrivals) but no secret data survives.
+
+### Passphrase protection
+
+Pushes can require a passphrase. Recipients who do not supply the correct passphrase cannot view the secret. Failed passphrase attempts are logged as `failed_passphrase` events in the audit log.
+
+### Audit logging
+
+Every interaction with a push is recorded. The `AuditLog` model tracks eight event kinds:
+
+| Event | Description |
+|---|---|
+| `creation` | Push was created |
+| `view` | Secret was successfully viewed |
+| `failed_view` | View attempted on an already-expired push |
+| `expire` | Push was explicitly expired or deleted |
+| `failed_passphrase` | Wrong passphrase entered |
+| `admin_view` | Admin viewed the push |
+| `owner_view` | Owner previewed the push |
+| `edit` | Push was edited |
+
+Each log entry captures the IP address, user agent, referrer, and timestamp of the request. Authenticated users can see their full audit trail in the dashboard.
+
+### Anonymous vs. authenticated usage
+
+By default (`PWP__ALLOW_ANONYMOUS: true`), anyone can create a push without logging in. Anonymous pushes have no owner and show no audit log to the creator.
+
+Authenticated users get:
+- A personal dashboard showing all their pushes
+- Full audit logs for each push (who viewed, when, from where)
+- The ability to delete a push before it expires naturally
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Try the hosted service or spin up Docker Compose in five steps.
+  </Card>
+  <Card title="How it works" icon="circle-info" href="/how-it-works">
+    Understand the push lifecycle, token generation, and expiration mechanics.
+  </Card>
+  <Card title="Deploy with Docker" icon="docker" href="/deployment/docker">
+    Detailed Docker Compose and environment variable reference.
+  </Card>
+  <Card title="API authentication" icon="code" href="/api/authentication">
+    Integrate Password Pusher into scripts and pipelines via the JSON REST API.
+  </Card>
+</CardGroup>

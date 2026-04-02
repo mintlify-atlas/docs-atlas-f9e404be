@@ -1,0 +1,199 @@
+---
+title: 'File storage'
+description: 'Configure the storage backend for file pushes: local disk, Amazon S3, MinIO, Google Cloud Storage, or Microsoft Azure Blob Storage.'
+---
+
+File storage is configured under the `files:` block in `settings.yml`. First choose a backend by setting `files.storage`, then supply the corresponding credentials.
+
+```yaml settings.yml
+files:
+  storage: 'local'   # local | amazon | minio | google | microsoft
+```
+
+```bash environment variable
+PWP__FILES__STORAGE='amazon'
+```
+
+<Warning>
+  Local disk storage (`local`) is unlikely to work correctly in container environments because containers typically do not have persistent volumes mounted. Use an object storage backend for any container or cloud deployment.
+</Warning>
+
+---
+
+<Tabs>
+  <Tab title="Local">
+
+## Local disk storage
+
+The default backend. Files are stored on the local filesystem of the server running Password Pusher.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Storage backend | `files.storage` | `PWP__FILES__STORAGE` | `'local'` |
+
+```yaml settings.yml
+files:
+  storage: 'local'
+```
+
+```bash environment variable
+PWP__FILES__STORAGE='local'
+```
+
+<Note>
+  No additional credentials are required for local storage. This is suitable for bare-metal or VM deployments where the application has persistent access to the filesystem.
+</Note>
+
+  </Tab>
+  <Tab title="Amazon S3">
+
+## Amazon S3
+
+Set `files.storage` to `'amazon'` and supply credentials under the `files.s3:` block.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Storage backend | `files.storage` | `PWP__FILES__STORAGE` | `'local'` |
+| Endpoint URL | `files.s3.endpoint` | `PWP__FILES__S3__ENDPOINT` | `''` |
+| Access key ID | `files.s3.access_key_id` | `PWP__FILES__S3__ACCESS_KEY_ID` | `'_'` |
+| Secret access key | `files.s3.secret_access_key` | `PWP__FILES__S3__SECRET_ACCESS_KEY` | `''` |
+| Region | `files.s3.region` | `PWP__FILES__S3__REGION` | `'us-east-1'` |
+| Bucket name | `files.s3.bucket` | `PWP__FILES__S3__BUCKET` | `'pwpush-files'` |
+
+The `endpoint` field is optional for standard AWS S3. Set it only if you need to override the default endpoint (for example, when using a VPC endpoint or a custom domain).
+
+```yaml settings.yml
+files:
+  storage: 'amazon'
+  s3:
+    endpoint: ''
+    access_key_id: 'AKIAIOSFODNN7EXAMPLE'
+    secret_access_key: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+    region: 'us-east-1'
+    bucket: 'my-pwpush-files'
+```
+
+```bash environment variables
+PWP__FILES__STORAGE='amazon'
+PWP__FILES__S3__ACCESS_KEY_ID='AKIAIOSFODNN7EXAMPLE'
+PWP__FILES__S3__SECRET_ACCESS_KEY='wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+PWP__FILES__S3__REGION='us-east-1'
+PWP__FILES__S3__BUCKET='my-pwpush-files'
+```
+
+  </Tab>
+  <Tab title="MinIO">
+
+## MinIO
+
+MinIO uses the same S3-compatible settings as Amazon S3. Set `files.storage` to `'minio'` and point `files.s3.endpoint` at your MinIO server.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Storage backend | `files.storage` | `PWP__FILES__STORAGE` | `'local'` |
+| Endpoint URL | `files.s3.endpoint` | `PWP__FILES__S3__ENDPOINT` | `''` |
+| Access key ID | `files.s3.access_key_id` | `PWP__FILES__S3__ACCESS_KEY_ID` | `'_'` |
+| Secret access key | `files.s3.secret_access_key` | `PWP__FILES__S3__SECRET_ACCESS_KEY` | `''` |
+| Region | `files.s3.region` | `PWP__FILES__S3__REGION` | `'us-east-1'` |
+| Bucket name | `files.s3.bucket` | `PWP__FILES__S3__BUCKET` | `'pwpush-files'` |
+
+```yaml settings.yml
+files:
+  storage: 'minio'
+  s3:
+    endpoint: 'https://minio.example.com'
+    access_key_id: 'minioadmin'
+    secret_access_key: 'minioadmin'
+    region: 'us-east-1'
+    bucket: 'pwpush-files'
+```
+
+```bash environment variables
+PWP__FILES__STORAGE='minio'
+PWP__FILES__S3__ENDPOINT='https://minio.example.com'
+PWP__FILES__S3__ACCESS_KEY_ID='minioadmin'
+PWP__FILES__S3__SECRET_ACCESS_KEY='minioadmin'
+PWP__FILES__S3__REGION='us-east-1'
+PWP__FILES__S3__BUCKET='pwpush-files'
+```
+
+  </Tab>
+  <Tab title="Google Cloud Storage">
+
+## Google Cloud Storage
+
+Set `files.storage` to `'google'` and supply credentials under the `files.gcs:` block.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Storage backend | `files.storage` | `PWP__FILES__STORAGE` | `'local'` |
+| GCP project ID | `files.gcs.project` | `PWP__FILES__GCS__PROJECT` | `''` |
+| Service account credentials | `files.gcs.credentials` | `PWP__FILES__GCS__CREDENTIALS` | `''` |
+| Bucket name | `files.gcs.bucket` | `PWP__FILES__GCS__BUCKET` | `''` |
+| Use IAM for URL signing | `files.gcs.iam` | `PWP__FILES__GCS__IAM` | `false` |
+| Service account email (IAM) | `files.gcs.gsa_email` | `PWP__FILES__GCS__GSA_EMAIL` | `null` |
+
+`credentials` accepts a path to a JSON key file or an inline JSON string containing a service account key.
+
+`iam` and `gsa_email` are used together when authenticating GKE workloads via Workload Identity instead of a static service account key.
+
+```yaml settings.yml
+files:
+  storage: 'google'
+  gcs:
+    project: 'my-gcp-project'
+    credentials: '/path/to/service-account.json'
+    bucket: 'my-pwpush-files'
+    iam: false
+    gsa_email: null
+```
+
+```bash environment variables
+PWP__FILES__STORAGE='google'
+PWP__FILES__GCS__PROJECT='my-gcp-project'
+PWP__FILES__GCS__CREDENTIALS='/path/to/service-account.json'
+PWP__FILES__GCS__BUCKET='my-pwpush-files'
+```
+
+For Workload Identity (GKE):
+
+```bash environment variables (Workload Identity)
+PWP__FILES__STORAGE='google'
+PWP__FILES__GCS__PROJECT='my-gcp-project'
+PWP__FILES__GCS__BUCKET='my-pwpush-files'
+PWP__FILES__GCS__IAM='true'
+PWP__FILES__GCS__GSA_EMAIL='service-account@my-gcp-project.iam.gserviceaccount.com'
+```
+
+  </Tab>
+  <Tab title="Microsoft Azure">
+
+## Microsoft Azure Blob Storage
+
+Set `files.storage` to `'microsoft'` and supply credentials under the `files.as:` block.
+
+| Setting | YAML key | Env var | Default |
+|---|---|---|---|
+| Storage backend | `files.storage` | `PWP__FILES__STORAGE` | `'local'` |
+| Storage account name | `files.as.storage_account_name` | `PWP__FILES__AS__STORAGE_ACCOUNT_NAME` | `''` |
+| Storage access key | `files.as.storage_access_key` | `PWP__FILES__AS__STORAGE_ACCESS_KEY` | `''` |
+| Container name | `files.as.container` | `PWP__FILES__AS__CONTAINER` | `''` |
+
+```yaml settings.yml
+files:
+  storage: 'microsoft'
+  as:
+    storage_account_name: 'mystorageaccount'
+    storage_access_key: 'base64encodedkey=='
+    container: 'pwpush-files'
+```
+
+```bash environment variables
+PWP__FILES__STORAGE='microsoft'
+PWP__FILES__AS__STORAGE_ACCOUNT_NAME='mystorageaccount'
+PWP__FILES__AS__STORAGE_ACCESS_KEY='base64encodedkey=='
+PWP__FILES__AS__CONTAINER='pwpush-files'
+```
+
+  </Tab>
+</Tabs>

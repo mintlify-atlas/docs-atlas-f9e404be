@@ -1,0 +1,310 @@
+---
+title: Docker
+description: Deploy Password Pusher using Docker or Docker Compose with optional TLS, persistent storage, and environment-based configuration.
+---
+
+The official Docker image for Password Pusher is published to Docker Hub and supports Linux/amd64 and Linux/arm64. It bundles a web server and an optional background worker managed by Foreman, so a single container handles both in the default configuration.
+
+<Note>
+  The image exposes ports `80`, `443`, and `5100`. Port `5100` is the internal Puma/Thrust port and is only needed if you are not using TLS. If you set `TLS_DOMAIN`, port `5100` can be removed from the port mapping.
+</Note>
+
+## Image tags
+
+| Tag      | Description                                       |
+| -------- | ------------------------------------------------- |
+| `latest` | Most recent build — generally reliable            |
+| `stable` | Well-tested releases — recommended for production |
+
+```
+docker.io/pglombardo/pwpush:latest
+docker.io/pglombardo/pwpush:stable
+```
+
+## Quick start with Docker Compose
+
+The repository ships a `docker-compose.yml` that covers the most common deployment scenario: a single container with a named volume for persistent SQLite storage and file uploads.
+
+<Steps>
+  <Step title="Copy the compose file">
+    Download or copy the `docker-compose.yml` from the repository root to your server.
+
+    ```bash
+    curl -O https://raw.githubusercontent.com/pglombardo/PasswordPusher/master/docker-compose.yml
+    ```
+  </Step>
+
+  <Step title="Configure environment variables">
+    Open `docker-compose.yml` and set your configuration under the `x-env` block. At minimum, consider setting `PWPUSH_MASTER_KEY` for production deployments and `TLS_DOMAIN` if you want automatic HTTPS.
+
+    ```yaml
+    # PWPUSH_MASTER_KEY: ""   # Generate at https://us.pwpush.com/generate_key
+    # TLS_DOMAIN: ""          # e.g. pwpush.example.com — provisions Let's Encrypt certs automatically
+    ```
+
+    Alternatively, uncomment `env_file: - .env` and place your variables in a `.env` file.
+  </Step>
+
+  <Step title="Start the container">
+    ```bash
+    docker compose up -d
+    ```
+  </Step>
+
+  <Step title="Access the application">
+    - **HTTP**: `http://localhost` (port 80)
+    - **HTTPS**: `https://localhost` (port 443, requires `TLS_DOMAIN`)
+    - **Direct Puma**: `http://localhost:5100`
+
+    Confirm the container is healthy:
+
+    ```bash
+    docker compose ps
+    curl -f http://localhost:5100/up
+    ```
+  </Step>
+</Steps>
+
+## Full docker-compose.yml
+
+The compose file below is the canonical file from the repository. Uncomment any variable to enable or change that behaviour.
+
+```yaml docker-compose.yml
+# Password Pusher - Docker Compose
+
+x-env: &x-env
+  environment:
+    # --- Overview ---
+    # Sensible defaults are set below; the app runs out of the box. Uncomment and set
+    # any option to customize your deployment.
+    #
+    # All configuration options below are described in more detail in the Password Pusher Configuration documentation:
+    # https://docs.pwpush.com/docs/self-hosted-configuration/
+
+    # --- Security & TLS ---
+    # PWPUSH_MASTER_KEY: This sets the encryption key for the database. If omitted, a default encryption key is used.
+    # For production, generate your own key and set it here so encrypted pushes use your key.
+    # Generate a new key here: https://us.pwpush.com/generate_key
+    # PWPUSH_MASTER_KEY: ""
+    #
+    # TLS_DOMAIN: For automatic TLS/SSL (e.g. HTTPS via Let's Encrypt), create a DNS record that
+    #   points to this host, then set this env var to that domain (e.g. pwpush.example.com).
+    #   The container will provision and renew certificates automatically.
+    # TLS_DOMAIN: ""
+
+    # --- Features ---
+    PWP__ENABLE_URL_PUSHES: "true"
+    PWP__ENABLE_FILE_PUSHES: "true"
+    PWP__ENABLE_QR_PUSHES: "true"
+    PWP__ALLOW_ANONYMOUS: "true"
+
+    # --- Deployment & URL ---
+    # PWP__HOST_DOMAIN: ""
+    # PWP__HOST_PROTOCOL: "https"
+    # PWP__OVERRIDE_BASE_URL: ""
+    # PWP__ALLOWED_HOSTS: ""
+    # PWP__TRUSTED_PROXIES: ""
+    # PWP__CLOUDFLARE_PROXY: "false"
+
+    # --- Authentication ---
+    # PWP__LOGIN_SESSION_TIMEOUT: "2 hours"
+    # PWP__DISABLE_SIGNUPS: "false"
+    # PWP__DISABLE_LOGINS: "false"
+    # PWP__SIGNUP_EMAIL_REGEXP: ""
+    # PWP__ENABLE_USER_ACCOUNT_EMAILS: "false"
+
+    # --- Mail (required for logins / account emails) ---
+    # PWP__MAIL__RAISE_DELIVERY_ERRORS: "false"
+    # PWP__MAIL__SMTP_ADDRESS: ""
+    # PWP__MAIL__SMTP_DOMAIN: ""
+    # PWP__MAIL__SMTP_PORT: "587"
+    # PWP__MAIL__SMTP_AUTHENTICATION: ""
+    # PWP__MAIL__SMTP_USER_NAME: ""
+    # PWP__MAIL__SMTP_PASSWORD: ""
+    # PWP__MAIL__SMTP_ENABLE_STARTTLS_AUTO: "true"
+    # PWP__MAIL__SMTP_OPEN_TIMEOUT: "10"
+    # PWP__MAIL__SMTP_READ_TIMEOUT: "10"
+    # PWP__MAIL__MAILER_SENDER: ""
+
+    # --- Push: password (pw) ---
+    # PWP__PW__EXPIRE_AFTER_DAYS_DEFAULT: "7"
+    # PWP__PW__EXPIRE_AFTER_DAYS_MIN: "1"
+    # PWP__PW__EXPIRE_AFTER_DAYS_MAX: "90"
+    # PWP__PW__EXPIRE_AFTER_VIEWS_DEFAULT: "5"
+    # PWP__PW__EXPIRE_AFTER_VIEWS_MIN: "1"
+    # PWP__PW__EXPIRE_AFTER_VIEWS_MAX: "100"
+    # PWP__PW__ENABLE_RETRIEVAL_STEP: "true"
+    # PWP__PW__RETRIEVAL_STEP_DEFAULT: "false"
+    # PWP__PW__ENABLE_DELETABLE_PUSHES: "true"
+    # PWP__PW__DELETABLE_PUSHES_DEFAULT: "true"
+    # PWP__PW__ENABLE_BLUR: "true"
+
+    # --- Push: URL ---
+    # PWP__URL__EXPIRE_AFTER_DAYS_DEFAULT: "7"
+    # PWP__URL__EXPIRE_AFTER_VIEWS_DEFAULT: "5"
+    # PWP__URL__ENABLE_RETRIEVAL_STEP: "true"
+    # PWP__URL__RETRIEVAL_STEP_DEFAULT: "false"
+
+    # --- Push: files ---
+    PWP__FILES__STORAGE: "local" # See: https://docs.pwpush.com/docs/self-hosted-configuration/#file-storage-backends
+    # PWP__FILES__EXPIRE_AFTER_DAYS_DEFAULT: "7"
+    # PWP__FILES__EXPIRE_AFTER_VIEWS_DEFAULT: "5"
+    # PWP__FILES__ENABLE_RETRIEVAL_STEP: "true"
+    # PWP__FILES__RETRIEVAL_STEP_DEFAULT: "false"
+    # PWP__FILES__ENABLE_DELETABLE_PUSHES: "true"
+    # PWP__FILES__DELETABLE_PUSHES_DEFAULT: "true"
+    # PWP__FILES__BLUR: "true"
+    # PWP__FILES__MAX_FILE_UPLOADS: "10"
+    # S3: PWP__FILES__S3__ENDPOINT, ACCESS_KEY_ID, SECRET_ACCESS_KEY, REGION, BUCKET
+    # GCS: PWP__FILES__GCS__PROJECT, CREDENTIALS, BUCKET, IAM, GSA_EMAIL
+    # Azure: PWP__FILES__AS__STORAGE_ACCOUNT_NAME, STORAGE_ACCESS_KEY, CONTAINER
+
+    # --- Push: QR ---
+    # PWP__QR__EXPIRE_AFTER_DAYS_DEFAULT: "7"
+    # PWP__QR__EXPIRE_AFTER_VIEWS_DEFAULT: "5"
+    # PWP__QR__ENABLE_RETRIEVAL_STEP: "true"
+    # PWP__QR__RETRIEVAL_STEP_DEFAULT: "false"
+    # PWP__QR__ENABLE_DELETABLE_PUSHES: "true"
+    # PWP__QR__DELETABLE_PUSHES_DEFAULT: "true"
+
+    # --- Password generator (gen) ---
+    # PWP__GEN__HAS_NUMBERS: "true"
+    # PWP__GEN__TITLE_CASED: "true"
+    # PWP__GEN__USE_SEPARATORS: "true"
+
+    # --- Branding & UI ---
+    # PWP__BRAND__TITLE: ""
+    # PWP__BRAND__TAGLINE: ""
+    # PWP__BRAND__DISCLAIMER: ""
+    # PWP__BRAND__SHOW_FOOTER_MENU: "true"
+    # PWP__SHOW_VERSION: "true"
+    # PWP__SHOW_GDPR_CONSENT_BANNER: "false"
+    # PWP__THEME: "default"
+    # PWP_PRECOMPILE: "false"  # Set "true" if using custom theme/assets!
+
+    # --- Locale ---
+    # PWP__TIMEZONE: "America/New_York"
+    # PWP__DEFAULT_LOCALE: "en"
+
+    # --- Security & infra ---
+    # PWP__SECURE_COOKIES: "false"
+    # PWP__THROTTLING__MINUTE: "120"
+    # PWP__THROTTLING__SECOND: "60"
+    # PWP__PURGE_AFTER: "disabled"
+
+    # --- Logging ---
+    # PWP__LOG_LEVEL: "warn"
+    # PWP__LOG_TO_STDOUT: "true"
+
+    # --- Docker / process ---
+    # PWP__NO_WORKER: "true"   # Web only (no background worker)
+
+services:
+  pwpush:
+    # "latest" is mostly reliable; use "stable" for well tested releases.
+    image: docker.io/pglombardo/pwpush:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "5100:5100" # This can be removed if you set TLS_DOMAIN
+    volumes:
+      - pwpush-storage:/opt/PasswordPusher/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5100/up"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    <<: *x-env
+    # env_file: - .env
+
+# Persists SQLite DB and file uploads. To use a host path instead, replace the
+# pwpush-storage service volume with: - /path/on/host:/opt/PasswordPusher/storage
+volumes:
+  pwpush-storage:
+    driver: local
+```
+
+## Key environment variables
+
+The table below covers the variables most commonly needed when first setting up a deployment. The full list of all `PWP__` options is documented in the [self-hosted configuration reference](https://docs.pwpush.com/docs/self-hosted-configuration/).
+
+| Variable             | Default | Description                                                                                                  |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| `PWPUSH_MASTER_KEY`  | —       | Encryption key for stored payloads. Omitting this uses a built-in default. Generate at `/generate_key`.      |
+| `TLS_DOMAIN`         | —       | Domain name for automatic Let's Encrypt TLS provisioning (e.g. `pwpush.example.com`).                       |
+| `PWP__ALLOW_ANONYMOUS` | `true` | Allow push creation without signing in.                                                                     |
+| `PWP__ENABLE_URL_PUSHES` | `true` | Enable URL push type.                                                                                   |
+| `PWP__ENABLE_FILE_PUSHES` | `true` | Enable file push type.                                                                                 |
+| `PWP__ENABLE_QR_PUSHES` | `true` | Enable QR code push type.                                                                               |
+| `PWP__FILES__STORAGE` | `local` | File storage backend: `local`, `s3`, `gcs`, or `azure`.                                                  |
+| `PWP__NO_WORKER`     | —       | Set to `true` to run the web process only, without the background worker.                                    |
+
+## Persistent storage
+
+The named volume `pwpush-storage` maps to `/opt/PasswordPusher/storage` inside the container. This directory holds:
+
+- The SQLite database (`storage/db/`)
+- Uploaded files when `PWP__FILES__STORAGE` is set to `local`
+
+To use a host path instead of a named volume, replace the volume entry in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - /path/on/host:/opt/PasswordPusher/storage
+```
+
+<Warning>
+  Removing the volume or changing the mount path without migrating data will result in data loss. The SQLite database lives inside this directory.
+</Warning>
+
+## Health check
+
+The container's built-in health check calls the `/up` endpoint every 30 seconds:
+
+```yaml
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:5100/up"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+```
+
+You can verify health at any time:
+
+```bash
+curl -f http://localhost:5100/up
+```
+
+## Using TLS / HTTPS
+
+Set `TLS_DOMAIN` to a fully-qualified domain name that already resolves to your server's IP. The container will provision and renew a Let's Encrypt certificate automatically.
+
+```yaml
+TLS_DOMAIN: "pwpush.example.com"
+```
+
+Once `TLS_DOMAIN` is set, port `5100` is no longer needed externally and can be removed from the port mapping:
+
+```yaml
+ports:
+  - "80:80"
+  - "443:443"
+  # - "5100:5100"  # not needed when TLS_DOMAIN is set
+```
+
+## Running without a compose file
+
+You can also run the container directly with `docker run`:
+
+```bash
+docker run -d \
+  --name pwpush \
+  --restart unless-stopped \
+  -p 80:80 -p 443:443 -p 5100:5100 \
+  -v pwpush-storage:/opt/PasswordPusher/storage \
+  -e PWPUSH_MASTER_KEY="your-key-here" \
+  docker.io/pglombardo/pwpush:stable
+```

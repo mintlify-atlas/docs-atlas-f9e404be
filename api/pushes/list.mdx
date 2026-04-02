@@ -1,0 +1,211 @@
+---
+title: 'List pushes'
+description: 'Retrieve paginated lists of your active or expired pushes.'
+---
+
+Two endpoints let you retrieve pushes associated with your account: one for pushes that are still active and one for pushes that have expired.
+
+Both endpoints require authentication. Anonymous pushes are not linked to an account and will not appear in these results.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/p/active.json` | List active (non-expired) pushes |
+| `GET` | `/p/expired.json` | List expired pushes |
+
+## Query parameters
+
+Both endpoints accept the same pagination parameter.
+
+<ParamField query="page" type="integer" default="1">
+  Page number to retrieve. Minimum `1`, maximum `200`. Returns up to 50 pushes per page, ordered by creation date descending.
+</ParamField>
+
+## Response
+
+Both endpoints return an array of push objects.
+
+<ResponseField name="url_token" type="string">
+  The unique token for the push.
+</ResponseField>
+
+<ResponseField name="html_url" type="string">
+  Fully qualified URL for viewing the push in a browser.
+</ResponseField>
+
+<ResponseField name="json_url" type="string">
+  Fully qualified URL for retrieving the push via the API.
+</ResponseField>
+
+<ResponseField name="expired" type="boolean">
+  Whether the push has expired.
+</ResponseField>
+
+<ResponseField name="deleted" type="boolean">
+  Whether the push was manually expired.
+</ResponseField>
+
+<ResponseField name="expire_after_days" type="integer">
+  The configured days-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="expire_after_views" type="integer">
+  The configured views-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="days_remaining" type="integer">
+  Computed days remaining before expiration.
+</ResponseField>
+
+<ResponseField name="views_remaining" type="integer">
+  Computed views remaining before expiration.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 creation timestamp.
+</ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  ISO 8601 timestamp for date-based expiration.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Dashboard label, if set.
+</ResponseField>
+
+<ResponseField name="note" type="string">
+  Private creator note, if set.
+</ResponseField>
+
+## Examples
+
+### Active pushes
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  https://pwpush.com/p/active.json
+```
+
+```bash cURL (page 2)
+curl -X GET \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  "https://pwpush.com/p/active.json?page=2"
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://pwpush.com/p/active.json",
+    headers={
+        "X-User-Email": "user@example.com",
+        "X-User-Token": "MyAPIToken",
+    },
+)
+print(response.json())
+```
+
+```ruby Ruby
+require "net/http"
+require "json"
+require "uri"
+
+uri = URI("https://pwpush.com/p/active.json")
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+
+request = Net::HTTP::Get.new(uri)
+request["X-User-Email"] = "user@example.com"
+request["X-User-Token"] = "MyAPIToken"
+
+response = http.request(request)
+puts JSON.parse(response.body)
+```
+
+</CodeGroup>
+
+```json 200 OK
+[
+  {
+    "url_token": "fkwjfvhall92",
+    "html_url": "https://pwpush.com/p/fkwjfvhall92",
+    "json_url": "https://pwpush.com/p/fkwjfvhall92.json",
+    "expired": false,
+    "deleted": false,
+    "expire_after_days": 7,
+    "expire_after_views": 5,
+    "days_remaining": 5,
+    "views_remaining": 3,
+    "created_at": "2023-10-20T15:32:01Z",
+    "expires_at": "2023-10-27T15:32:01Z",
+    "name": "Onboarding credentials",
+    "note": ""
+  }
+]
+```
+
+### Expired pushes
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  https://pwpush.com/p/expired.json
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://pwpush.com/p/expired.json",
+    headers={
+        "X-User-Email": "user@example.com",
+        "X-User-Token": "MyAPIToken",
+    },
+)
+print(response.json())
+```
+
+</CodeGroup>
+
+```json 200 OK
+[
+  {
+    "url_token": "abc123xyz",
+    "html_url": "https://pwpush.com/p/abc123xyz",
+    "json_url": "https://pwpush.com/p/abc123xyz.json",
+    "expired": true,
+    "deleted": false,
+    "expire_after_days": 3,
+    "expire_after_views": 2,
+    "days_remaining": 0,
+    "views_remaining": 0,
+    "created_at": "2023-10-15T10:00:00Z",
+    "expires_at": "2023-10-18T10:00:00Z",
+    "name": "",
+    "note": ""
+  }
+]
+```
+
+## Error responses
+
+```json 401 Unauthorized
+{}
+```
+
+```json 400 Bad Request
+{
+  "error": "Invalid page parameter"
+}
+```
+
+The `400` response is returned when `page` is not a valid integer or exceeds the maximum of 200.

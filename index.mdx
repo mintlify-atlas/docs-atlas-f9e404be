@@ -1,97 +1,61 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Password Pusher"
+description: "Securely share passwords, files, and secrets with self-deleting links and full audit logs."
 ---
 
-## Setting up
+Password Pusher is an open source tool for sharing sensitive information safely. Create a one-time link that expires automatically after a set number of views or days — no more emailing passwords in plain text.
 
-Get your documentation site up and running in minutes.
+Use the [hosted service at pwpush.com](https://pwpush.com) or deploy your own instance with Docker in minutes.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running in under 5 minutes — hosted or self-hosted.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="How it Works" icon="circle-info" href="/how-it-works">
+    Understand the security model and push lifecycle.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Deploy with Docker" icon="docker" href="/deployment/docker">
+    Self-host Password Pusher with a single Docker Compose command.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Integrate via the JSON REST API for automation and scripting.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why Password Pusher?
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Encrypted & self-deleting" icon="lock">
+    Secrets are encrypted at rest and permanently deleted once a link expires — by views, by time, or both.
+  </Card>
+  <Card title="Full audit trail" icon="list-check">
+    See every view event: who viewed, when, from which IP, and with which browser.
+  </Card>
+  <Card title="Self-host or hosted" icon="server">
+    Run on your own infrastructure via Docker, Kubernetes, or Helm — or use pwpush.com.
+  </Card>
+  <Card title="JSON API & integrations" icon="plug">
+    Automate secret sharing with the REST API, CLI tools, and community integrations.
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Push types
 
-## Need inspiration?
+Password Pusher supports four types of secure pushes:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+- **Text / password** — Share any secret text with a one-time link
+- **File** — Upload and share files that self-delete after viewing
+- **URL** — Share a URL that redirects once and then expires
+- **QR code** — Generate a QR code from any text, shared securely
+
+<Steps>
+  <Step title="Create a push">
+    Enter your secret, set expiration limits, and click **Push it!** to get a one-time link.
+  </Step>
+  <Step title="Share the link">
+    Send the generated link to your recipient via email, chat, or any channel.
+  </Step>
+  <Step title="Link auto-expires">
+    After the set number of views or days, the secret is permanently deleted. Nothing lingers.
+  </Step>
+</Steps>

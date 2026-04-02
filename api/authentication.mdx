@@ -1,0 +1,132 @@
+---
+title: 'Authentication'
+description: 'How to authenticate with the Password Pusher API using API tokens.'
+---
+
+The Password Pusher API supports both authenticated and anonymous access. Authentication is done via API token — there are no OAuth flows or session cookies involved.
+
+## Getting your API token
+
+Your API token is available in your account settings page on your Password Pusher instance. Navigate to your profile or account settings after signing in to find it.
+
+The token is generated per user account and can be regenerated at any time from the same settings page. Regenerating a token immediately invalidates the old one.
+
+<Warning>
+  Treat your API token like a password. Anyone with your token and email address can make authenticated API requests on your behalf.
+</Warning>
+
+## Making authenticated requests
+
+Every authenticated request requires two headers:
+
+| Header | Value |
+|---|---|
+| `X-User-Email` | The email address of your account |
+| `X-User-Token` | Your API token from account settings |
+
+Both headers must be present when using the token header method. Alternatively, use a single `Authorization: Bearer <token>` header — in this case, `X-User-Email` is not required.
+
+The API also accepts a standard `Authorization: Bearer <token>` header as an alternative to `X-User-Token`. When using Bearer auth, the `X-User-Email` header is not required.
+
+<CodeGroup>
+
+```bash cURL (token headers)
+curl -X POST \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  -H "Content-Type: application/json" \
+  -d '{"password": {"payload": "secret_text"}}' \
+  https://pwpush.com/p.json
+```
+
+```bash cURL (Bearer token)
+curl -X POST \
+  -H "Authorization: Bearer MyAPIToken" \
+  -H "Content-Type: application/json" \
+  -d '{"password": {"payload": "secret_text"}}' \
+  https://pwpush.com/p.json
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://pwpush.com/p.json",
+    headers={
+        "X-User-Email": "user@example.com",
+        "X-User-Token": "MyAPIToken",
+        "Content-Type": "application/json",
+    },
+    json={"password": {"payload": "secret_text"}},
+)
+print(response.json())
+```
+
+```ruby Ruby
+require "net/http"
+require "json"
+require "uri"
+
+uri = URI("https://pwpush.com/p.json")
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+
+request = Net::HTTP::Post.new(uri.path)
+request["X-User-Email"] = "user@example.com"
+request["X-User-Token"] = "MyAPIToken"
+request["Content-Type"] = "application/json"
+request.body = JSON.dump({ password: { payload: "secret_text" } })
+
+response = http.request(request)
+puts JSON.parse(response.body)
+```
+
+</CodeGroup>
+
+## Anonymous access
+
+Creating pushes does not require authentication by default. When `allow_anonymous` is enabled on the instance (the default), you can create pushes without any credentials.
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"password": {"payload": "secret_text"}}' \
+  https://pwpush.com/p.json
+```
+
+<Note>
+  Anonymous pushes are not linked to any account. You cannot retrieve, audit, or delete them via the API after creation. If you need to manage your pushes programmatically, authenticate your requests.
+</Note>
+
+If the instance has `allow_anonymous` set to `false`, all push creation requests will also require authentication.
+
+## Endpoints that require authentication
+
+The following actions always require a valid authenticated session regardless of the `allow_anonymous` setting:
+
+- **List active pushes** — `GET /p/active.json`
+- **List expired pushes** — `GET /p/expired.json`
+- **Retrieve audit log** — `GET /p/:url_token/audit.json`
+- **Delete/expire a push** — `DELETE /p/:url_token.json` (unless the push was created with `deletable_by_viewer`)
+
+## Error responses
+
+### 401 Unauthorized
+
+Returned when authentication is required but credentials are missing, or when provided credentials are invalid.
+
+```json
+HTTP/1.1 401 Unauthorized
+```
+
+The response body is empty for authentication failures. Check that both `X-User-Email` and `X-User-Token` headers are present and correct.
+
+### 403 Forbidden
+
+Returned when you are authenticated but attempting to access a resource you do not own, such as the audit log for another user's push.
+
+```json
+{
+  "error": "That push doesn't belong to you."
+}
+```

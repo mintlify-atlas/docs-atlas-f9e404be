@@ -1,0 +1,459 @@
+---
+title: Cloud platforms
+description: Deploy Password Pusher to Render, Fly.io, Railway, Heroku, or DigitalOcean App Platform using the config-as-code files included in the repository.
+---
+
+The repository ships platform-specific configuration files that let you deploy Password Pusher to several cloud platforms with minimal setup. Each platform file is kept in the repository root (or `.do/`) and captures the build commands, environment defaults, and database configuration needed for that platform.
+
+<Tabs>
+  <Tab title="Render">
+
+## Render
+
+The `render.yaml` file is a [Render Blueprint](https://render.com/docs/blueprint-spec) that provisions a PostgreSQL database and a Ruby web service together.
+
+### What gets created
+
+| Resource     | Type         | Details                              |
+| ------------ | ------------ | ------------------------------------ |
+| `pwpush-db`  | PostgreSQL   | Free plan, database name `pwpush`    |
+| `pwpush-web` | Web service  | Ruby runtime, Starter plan, Oregon region |
+
+### Deploy steps
+
+<Steps>
+  <Step title="Connect the repository">
+    In the Render dashboard, select **New → Blueprint** and connect the `pglombardo/PasswordPusher` GitHub repository. Render will detect `render.yaml` automatically.
+  </Step>
+  <Step title="Set secrets">
+    `SECRET_KEY_BASE` and `PWPUSH_MASTER_KEY` are marked `generateValue: true` in the blueprint, so Render generates them automatically on first deploy. You can override them in the service's **Environment** tab.
+  </Step>
+  <Step title="Deploy">
+    Click **Apply**. Render will build the app (`bundle install && bundle exec rails assets:precompile`), run `bundle exec rails db:prepare` as a pre-deploy command, then start the web process with `bundle exec bin/thrust bin/rails server`.
+  </Step>
+</Steps>
+
+### render.yaml
+
+```yaml
+# Render Blueprint – Password Pusher (pwpush)
+# https://render.com/docs/blueprint-spec
+
+databases:
+  - name: pwpush-db
+    plan: free
+    databaseName: pwpush
+    user: pwpush
+
+services:
+  - type: web
+    name: pwpush-web
+    runtime: ruby
+    plan: starter
+    region: oregon
+    buildCommand: bundle install && bundle exec rails assets:precompile
+    preDeployCommand: bundle exec rails db:prepare
+    startCommand: bundle exec bin/thrust bin/rails server
+    healthCheckPath: /up
+    envVars:
+      - key: RAILS_ENV
+        value: production
+      - key: RACK_ENV
+        value: production
+      - key: RAILS_LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pwpush-db
+          property: connectionString
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: PWPUSH_MASTER_KEY
+        generateValue: true
+      - key: PWP__ALLOW_ANONYMOUS
+        value: "true"
+      - key: PWP__DISABLE_SIGNUPS
+        value: "false"
+      - key: PWP__DISABLE_LOGINS
+        value: "false"
+      - key: PWP__ENABLE_FILE_PUSHES
+        value: "true"
+      - key: PWP__ENABLE_URL_PUSHES
+        value: "true"
+      - key: PWP__ENABLE_QR_PUSHES
+        value: "true"
+      - key: PWP__ENABLE_USER_ACCOUNT_EMAILS
+        value: "false"
+    # Uncomment for Solid Queue worker (separate dyno):
+    # - type: worker
+    #   name: pwpush-worker
+    #   runtime: ruby
+    #   plan: starter
+    #   buildCommand: bundle install
+    #   startCommand: bundle exec rake solid_queue:start
+    #   envVars: (same as web, link DATABASE_URL etc.)
+```
+
+<Note>
+  The health check path is `/up`. Render will mark the deploy as failed if this endpoint does not return a successful response.
+</Note>
+
+  </Tab>
+  <Tab title="Fly.io">
+
+## Fly.io
+
+The `fly.toml` file configures a Fly.io application that builds from the repository's `containers/docker/Dockerfile`.
+
+### Deploy steps
+
+<Steps>
+  <Step title="Create the app">
+    ```bash
+    fly launch --no-deploy --dockerfile containers/docker/Dockerfile
+    ```
+    This registers a new app and writes machine configuration without deploying yet. Update `app = "pwpush-replace-me"` in `fly.toml` to your chosen app name.
+  </Step>
+  <Step title="Set secrets">
+    ```bash
+    fly secrets set \
+      SECRET_KEY_BASE="$(bundle exec rails secret)" \
+      PWPUSH_MASTER_KEY="$(openssl rand -hex 32)"
+    ```
+  </Step>
+  <Step title="Provision a database">
+    ```bash
+    fly postgres create
+    ```
+    Then attach it to your app, or set `DATABASE_URL` directly as a secret.
+  </Step>
+  <Step title="Deploy">
+    ```bash
+    fly deploy
+    ```
+  </Step>
+</Steps>
+
+### fly.toml
+
+```toml
+# Fly.io – Password Pusher
+# https://fly.io/docs/reference/configuration/
+
+app = "pwpush-replace-me"
+primary_region = "iad"
+
+[build]
+  dockerfile = "containers/docker/Dockerfile"
+
+[env]
+  RAILS_ENV = "production"
+  RACK_ENV = "production"
+  RAILS_LOG_LEVEL = "info"
+  PWP__ALLOW_ANONYMOUS = "true"
+  PWP__DISABLE_SIGNUPS = "false"
+  PWP__DISABLE_LOGINS = "false"
+  PWP__ENABLE_FILE_PUSHES = "true"
+  PWP__ENABLE_URL_PUSHES = "true"
+  PWP__ENABLE_QR_PUSHES = "true"
+  PWP__ENABLE_USER_ACCOUNT_EMAILS = "false"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.http]
+    port = 8080
+    type = "http"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/up"
+```
+
+### Worker process
+
+By default the container entrypoint runs both the web server and the background worker via Foreman. To run the web process only, set:
+
+```bash
+fly secrets set PWP__NO_WORKER=1
+```
+
+  </Tab>
+  <Tab title="Railway">
+
+## Railway
+
+The `railway.toml` file instructs Railway to build the app from `containers/docker/Dockerfile`. No `startCommand` is specified — Railway uses the image `ENTRYPOINT` directly (`entrypoint.sh`).
+
+### Deploy steps
+
+<Steps>
+  <Step title="Create a new project">
+    Run `railway init` in the repository directory, or create a new project from the Railway dashboard and link the repository.
+  </Step>
+  <Step title="Add a PostgreSQL plugin">
+    In the Railway dashboard, add the **PostgreSQL** plugin to your project. Railway will inject `DATABASE_URL` into your service automatically.
+  </Step>
+  <Step title="Set required variables">
+    In the Railway dashboard, add the following variables to your service:
+
+    | Variable           | Value                              |
+    | ------------------ | ---------------------------------- |
+    | `SECRET_KEY_BASE`  | Output of `bundle exec rails secret` |
+    | `PWPUSH_MASTER_KEY`| Output of `openssl rand -hex 32`   |
+    | `DATABASE_URL`     | Injected automatically from the PostgreSQL plugin, or set manually |
+  </Step>
+  <Step title="Deploy">
+    Railway triggers a build automatically when you push to the linked branch, or run:
+    ```bash
+    railway up
+    ```
+  </Step>
+</Steps>
+
+### railway.toml
+
+```toml
+# Railway – Password Pusher
+# https://docs.railway.com/reference/config-as-code
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "containers/docker/Dockerfile"
+
+# startCommand omitted → uses image ENTRYPOINT (entrypoint.sh)
+```
+
+### Worker process
+
+The entrypoint runs the web server and background worker together by default. To run the web process only, set `PWP__NO_WORKER=1` in the Railway variables dashboard.
+
+<Tip>
+  Add `deploy.healthcheckPath = "/up"` in your Railway service settings or extend `railway.toml` per the Railway JSON schema to enable health checks.
+</Tip>
+
+  </Tab>
+  <Tab title="Heroku">
+
+## Heroku
+
+The `app.json` file enables one-click Heroku deployment. It uses the `heroku/ruby` buildpack with stack `heroku-24` and automatically provisions a `heroku-postgresql` add-on.
+
+### Deploy steps
+
+<Steps>
+  <Step title="Use the Deploy to Heroku button or CLI">
+    Click the **Deploy to Heroku** button from the repository README, or run:
+    ```bash
+    heroku create my-pwpush-app
+    git push heroku master
+    ```
+  </Step>
+  <Step title="Secrets are auto-generated">
+    `SECRET_KEY_BASE` and `PWPUSH_MASTER_KEY` have `"generator": "secret"` set in `app.json`, so Heroku generates values automatically.
+  </Step>
+  <Step title="Run database migrations">
+    The `postdeploy` script in `app.json` runs `bundle exec rails db:prepare` automatically after the first deploy.
+  </Step>
+</Steps>
+
+### app.json
+
+```json
+{
+  "name": "PasswordPusher",
+  "description": "Share passwords, text, files, URLs, and QR payloads via secret links that expire by views and/or time.",
+  "stack": "heroku-24",
+  "buildpacks": [
+    { "url": "heroku/ruby" }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql",
+      "as": "DATABASE"
+    }
+  ],
+  "scripts": {
+    "postdeploy": "bundle exec rails db:prepare"
+  },
+  "env": {
+    "BUNDLE_WITHOUT":           { "value": "development:test" },
+    "RAILS_LOG_TO_STDOUT":      { "value": "true" },
+    "RAILS_SERVE_STATIC_FILES": { "value": "true" },
+    "SECRET_KEY_BASE":          { "generator": "secret" },
+    "PWPUSH_MASTER_KEY":        { "generator": "secret" },
+    "WEB_CONCURRENCY":          { "value": "2" },
+    "PWP__HOST_PROTOCOL":       { "value": "https" },
+    "PWP__FILES__STORAGE":      { "value": "local" },
+    "PWP__ALLOW_ANONYMOUS":     { "value": "true" },
+    "PWP__DISABLE_SIGNUPS":     { "value": "false" },
+    "PWP__DISABLE_LOGINS":      { "value": "false" },
+    "PWP__ENABLE_USER_ACCOUNT_EMAILS": { "value": "false" },
+    "PWP__ENABLE_FILE_PUSHES":  { "value": "true" },
+    "PWP__ENABLE_URL_PUSHES":   { "value": "true" },
+    "PWP__ENABLE_QR_PUSHES":    { "value": "true" },
+    "PWP__THEME":               { "value": "default" }
+  }
+}
+```
+
+### Important Heroku-specific variables
+
+| Variable                    | Notes                                                                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `PWP__HOST_DOMAIN`          | Set to your Heroku app hostname (e.g. `myapp.herokuapp.com`) for correct secret URLs.    |
+| `PWP__OVERRIDE_BASE_URL`    | Set if the app is behind a proxy or custom domain (e.g. `https://secrets.example.com`). |
+| `PWP__ALLOWED_HOSTS`        | Space-separated hostnames Rails should accept in the `Host` header.                      |
+| `PWP__FILES__STORAGE`       | Defaults to `local`. File uploads are ephemeral on Heroku — use `s3` for durable storage.|
+
+<Warning>
+  Heroku's filesystem is ephemeral. File pushes stored with `PWP__FILES__STORAGE=local` will be lost on dyno restarts. Configure an S3-compatible storage backend for durable file pushes.
+</Warning>
+
+  </Tab>
+  <Tab title="DigitalOcean">
+
+## DigitalOcean App Platform
+
+The `.do/deploy.template.yaml` file is an [App Platform app spec](https://docs.digitalocean.com/products/app-platform/reference/app-spec/) that provisions a managed PostgreSQL 16 database alongside a Ruby on Rails web service.
+
+### What gets created
+
+| Resource             | Type         | Details                                         |
+| -------------------- | ------------ | ----------------------------------------------- |
+| `pwpush-db`          | PostgreSQL   | Version 16, production tier                     |
+| `pwpush`             | Web service  | Ruby on Rails, `apps-s-1vcpu-1gb` instance      |
+| `db-prepare-after-deploy` | Post-deploy job | Runs `bundle exec rails db:prepare`    |
+
+### Deploy steps
+
+<Steps>
+  <Step title="Fork or connect the repository">
+    In the DigitalOcean dashboard, click **Create → Apps** and connect the `pglombardo/PasswordPusher` GitHub repository on the `master` branch.
+  </Step>
+  <Step title="Select the app spec">
+    DigitalOcean will detect `.do/deploy.template.yaml` automatically. Review the spec in the UI.
+  </Step>
+  <Step title="Set secret values">
+    The spec ships with placeholder values for `SECRET_KEY_BASE` and `PWPUSH_MASTER_KEY`. Replace them in the App Platform dashboard under the service's **Environment Variables** before deploying — never commit real keys.
+
+    | Variable            | How to generate                                      |
+    | ------------------- | ---------------------------------------------------- |
+    | `SECRET_KEY_BASE`   | `bundle exec rails secret`                           |
+    | `PWPUSH_MASTER_KEY` | `bundle exec rails runner 'puts Lockbox.generate_key'` |
+  </Step>
+  <Step title="Set your hostname (after first deploy)">
+    After the first deploy completes, copy your app's `.ondigitalocean.app` hostname and set it as `PWP__HOST_DOMAIN` and optionally `PWP__ALLOWED_HOSTS` in the environment variables to ensure secret URLs are generated correctly.
+  </Step>
+</Steps>
+
+### deploy.template.yaml (key sections)
+
+```yaml
+spec:
+  name: passwordpusher
+  region: nyc
+
+  features:
+    - buildpack-stack=ubuntu-22
+
+  alerts:
+    - rule: DEPLOYMENT_FAILED
+    - rule: DOMAIN_FAILED
+
+  databases:
+    - name: pwpush-db
+      engine: PG
+      version: "16"
+      production: true
+
+  services:
+    - name: pwpush
+      environment_slug: ruby-on-rails
+      github:
+        branch: master
+        deploy_on_push: true
+        repo: pglombardo/PasswordPusher
+      run_command: bundle exec bin/thrust bin/rails server
+      instance_count: 1
+      instance_size_slug: apps-s-1vcpu-1gb
+      http_port: 8080
+      envs:
+        - key: RAILS_ENV
+          scope: RUN_AND_BUILD_TIME
+          type: GENERAL
+          value: production
+        - key: RACK_ENV
+          scope: RUN_AND_BUILD_TIME
+          type: GENERAL
+          value: production
+        - key: SECRET_KEY_BASE
+          scope: RUN_TIME
+          type: SECRET
+          value: "REPLACE_ME_run_rails_secret"
+        - key: PWPUSH_MASTER_KEY
+          scope: RUN_TIME
+          type: SECRET
+          value: "REPLACE_ME_run_rails_runner_puts_Lockbox_generate_key"
+        - key: PWP__HOST_PROTOCOL
+          scope: RUN_TIME
+          type: GENERAL
+          value: https
+        - key: PWP__ALLOW_ANONYMOUS
+          scope: RUN_TIME
+          type: GENERAL
+          value: "true"
+        - key: PWP__ENABLE_FILE_PUSHES
+          scope: RUN_TIME
+          type: GENERAL
+          value: "true"
+        - key: PWP__ENABLE_URL_PUSHES
+          scope: RUN_TIME
+          type: GENERAL
+          value: "true"
+        - key: PWP__ENABLE_QR_PUSHES
+          scope: RUN_TIME
+          type: GENERAL
+          value: "true"
+        - key: PWP__FILES__STORAGE
+          scope: RUN_TIME
+          type: GENERAL
+          value: local
+
+  jobs:
+    - name: db-prepare-after-deploy
+      kind: POST_DEPLOY
+      environment_slug: ruby-on-rails
+      github:
+        branch: master
+        deploy_on_push: true
+        repo: pglombardo/PasswordPusher
+      run_command: bundle exec rails db:prepare
+      instance_count: 1
+      instance_size_slug: apps-s-1vcpu-0.5gb
+```
+
+<Warning>
+  The `PWP__FILES__STORAGE` value defaults to `local` in the template. File uploads stored locally are ephemeral on App Platform. Configure an S3-compatible storage backend for durable file pushes.
+</Warning>
+
+  </Tab>
+</Tabs>

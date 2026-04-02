@@ -1,0 +1,132 @@
+---
+title: 'Push types'
+description: 'Password Pusher supports four types of pushes — text, file, URL, and QR code — each suited to a different sharing scenario.'
+---
+
+Every push generates a unique secret URL that expires automatically. The four push types share a common expiration model but differ in what they carry and how recipients interact with them.
+
+<CardGroup cols={2}>
+  <Card title="Text / Password" icon="lock">
+    Share any secret text — passwords, tokens, private keys, or notes.
+  </Card>
+  <Card title="File" icon="file">
+    Upload and share up to 10 files per push with automatic deletion on expiry.
+  </Card>
+  <Card title="URL" icon="link">
+    Share a URL that redirects once and then self-destructs.
+  </Card>
+  <Card title="QR Code" icon="qrcode">
+    Generate a scannable QR code from text and share it securely.
+  </Card>
+</CardGroup>
+
+---
+
+## Text / password
+
+**Use case:** Share any sensitive text — a password, API key, private note, or one-time code — with a single recipient.
+
+The payload is encrypted at rest. When the recipient opens the secret URL the text is decrypted and displayed, then the view count advances toward the expiry limit.
+
+**Key options:**
+
+| Option | Details |
+|--------|---------|
+| Payload size | Up to 1 MB |
+| Blur on display | When enabled the text is visually blurred until the recipient clicks to reveal it. Useful in public spaces. Enabled by default (`PWP__PW__ENABLE_BLUR`). |
+| Deletable by viewer | Lets the recipient permanently destroy the push before the expiry limits are reached. Enabled by default. |
+| Passphrase | Require a passphrase before the payload is shown. |
+| Retrieval step | Shows a confirmation page at `/p/:token/r` before counting a view, protecting against link-preview scanners. |
+
+**URL pattern:** `/p/:token`
+
+<Note>
+The blur feature applies to the web UI only. The JSON API always returns the plaintext payload to authenticated callers.
+</Note>
+
+---
+
+## File
+
+**Use case:** Securely transfer files (documents, certificates, SSH keys, archives) that should be available for a limited time only.
+
+Files are stored in the configured backend (local disk, Amazon S3, Google Cloud Storage, or Microsoft Azure Blob Storage) and are permanently purged when the push expires.
+
+**Key options:**
+
+| Option | Details |
+|--------|---------|
+| Maximum files | Up to 10 files per push (`PWP__FILES__MAX_FILE_UPLOADS`) |
+| Storage backend | Local, Amazon S3, Minio, Google Cloud Storage, or Microsoft Azure |
+| Deletable by viewer | Lets the recipient expire the push early and trigger file deletion. |
+| Blur on display | File listing is blurred until clicked, same as text pushes. |
+| Retrieval step | Preview page at `/f/:token/r` before registering a view. |
+
+**URL pattern:** `/f/:token`
+
+<Warning>
+File pushes require authentication when using the JSON API. Anonymous API access is not available for file uploads.
+</Warning>
+
+<Tip>
+File deletion is deferred to the next `ExpirePushesJob` run when files are attached. The files are purged as soon as the job runs, not immediately after the final view.
+</Tip>
+
+---
+
+## URL
+
+**Use case:** Share a sensitive link (a pre-signed download URL, a one-time login link, an internal resource) that should redirect once and then stop working.
+
+When a recipient opens the secret URL, Password Pusher immediately redirects them to the target URL and records the view. Once the expiry threshold is crossed the redirect no longer functions and the target URL is deleted.
+
+**Key options:**
+
+| Option | Details |
+|--------|---------|
+| Payload | Must be a valid HTTP or HTTPS URL |
+| Retrieval step | Preview page at `/r/:token/r` before the redirect fires and counts as a view. |
+| Passphrase | Require a passphrase before the redirect fires. |
+
+**URL pattern:** `/r/:token`
+
+<Note>
+URL pushes do not support the "deletable by viewer" option. The `deletable_by_viewer` field is ignored for this push type.
+</Note>
+
+---
+
+## QR code
+
+**Use case:** Share a QR code securely — for example, a Wi-Fi password, a contact card, or a link intended for mobile scanning.
+
+Password Pusher generates the QR code server-side from the provided text and serves it through the standard expiring URL mechanism. The recipient scans the code from their device without needing to type anything.
+
+**Key options:**
+
+| Option | Details |
+|--------|---------|
+| Payload size | Up to 1,024 characters |
+| Deletable by viewer | Lets the recipient expire the push before limits are reached. |
+| Retrieval step | Preview page at `/p/:token/r` before the QR code is shown and a view is counted. |
+| Passphrase | Protect the QR code display with a passphrase. |
+
+**URL pattern:** `/p/:token`
+
+<Warning>
+The QR code payload is limited to 1,024 characters. Inputs exceeding this length are rejected at creation time.
+</Warning>
+
+---
+
+## Enabling and disabling push types
+
+Each push type can be independently enabled or disabled for your instance:
+
+```bash
+PWP__ENABLE_URL_PUSHES=true
+PWP__ENABLE_FILE_PUSHES=true
+PWP__ENABLE_QR_PUSHES=true
+```
+
+Text pushes are always available and cannot be disabled.

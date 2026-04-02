@@ -1,0 +1,425 @@
+---
+title: Kubernetes
+description: Deploy Password Pusher on Kubernetes using the bundled manifests for ephemeral or persistent deployments, or use the included Helm chart.
+---
+
+The repository includes Kubernetes manifests under `containers/kubernetes/` and a Helm chart under `containers/helm/`. Two deployment modes are supported:
+
+- **Ephemeral** — single container, no database volume. Data is lost when the pod restarts. Suitable for evaluation or stateless use cases.
+- **Persistent** — two-container pod (Password Pusher + PostgreSQL) backed by a `PersistentVolume`. Data survives pod restarts.
+
+<Note>
+  The bundled manifests assume an nginx ingress controller is deployed in the cluster and that `cert-manager` is installed with a `ClusterIssuer` named `letsencrypt-prod`. Adjust `ingress.yaml` if your cluster uses a different setup.
+</Note>
+
+## Kubernetes objects provisioned
+
+Both deployment types create the following objects in the `pwpush` namespace:
+
+| Kind        | Name             | Notes                                           |
+| ----------- | ---------------- | ----------------------------------------------- |
+| Namespace   | `pwpush`         |                                                 |
+| Deployment  | `pwpush`         | Includes a `postgres` container for persistent  |
+| Service     | `pwpush-http`    | `ClusterIP`, port `5100`                        |
+| Ingress     | `pwpush-ingress` | TLS via cert-manager; host `pwpush.domain.tld`  |
+| PersistentVolume | `pwpush-data-pv` | Persistent deploy only                     |
+| PersistentVolumeClaim | `pwpush-data-pvc` | Persistent deploy only              |
+
+## Updating the ingress hostname
+
+Both deployment types use `pwpush.domain.tld` as the default hostname in `ingress.yaml`. Replace it with your actual domain before applying:
+
+```bash
+sed -i 's|pwpush.domain.tld|pwpush.your.domain.here|g' containers/kubernetes/ingress.yaml
+```
+
+cert-manager will provision a Let's Encrypt certificate automatically once DNS for that domain points to your cluster.
+
+---
+
+## Ephemeral deployment
+
+An ephemeral deployment runs a single Password Pusher container with no attached storage. Pushes are stored in an in-memory SQLite database and are lost if the pod is deleted or rescheduled.
+
+### Apply the manifests
+
+```bash
+kubectl apply -f containers/kubernetes/namespace.yaml
+kubectl apply -f containers/kubernetes/ephemeral_deploy.yaml
+kubectl apply -f containers/kubernetes/service.yaml
+kubectl apply -f containers/kubernetes/ingress.yaml
+```
+
+### ephemeral\_deploy.yaml
+
+```yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pwpush
+    component: ingress-controller
+    type: nginx
+  name: pwpush
+  namespace: pwpush
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: pwpush
+      component: ingress-controller
+      type: nginx
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: pwpush
+        component: ingress-controller
+        type: nginx
+    spec:
+      containers:
+      - image: docker.io/pglombardo/pwpush
+        imagePullPolicy: Always
+        name: pwpush
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+```
+
+---
+
+## Persistent deployment
+
+A persistent deployment runs Password Pusher alongside a PostgreSQL 15 sidecar container. PostgreSQL data is written to a `PersistentVolumeClaim` (`pwpush-data-pvc`) backed by a `PersistentVolume` at a host path.
+
+### Configure the host path
+
+The default host path in `pv.yaml` is `/your/path/here`. Update it before applying:
+
+```bash
+sed -i 's|/your/path/here|/your/actual/path|g' containers/kubernetes/pv.yaml
+```
+
+This path must exist on the node(s) that will run the deployment. If your cluster uses a different volume type (NFS, cloud block storage, etc.), edit `containers/kubernetes/pv.yaml` accordingly.
+
+### Apply the manifests
+
+```bash
+kubectl apply -f containers/kubernetes/namespace.yaml
+kubectl apply -f containers/kubernetes/pv.yaml
+kubectl apply -f containers/kubernetes/pvc.yaml
+kubectl apply -f containers/kubernetes/persistent_deploy.yaml
+kubectl apply -f containers/kubernetes/service.yaml
+kubectl apply -f containers/kubernetes/ingress.yaml
+```
+
+### persistent\_deploy.yaml
+
+```yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pwpush
+    component: ingress-controller
+    type: nginx
+  name: pwpush
+  namespace: pwpush
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: pwpush
+      component: ingress-controller
+      type: nginx
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: pwpush
+        component: ingress-controller
+        type: nginx
+    spec:
+      containers:
+      - image: docker.io/pglombardo/pwpush
+        imagePullPolicy: Always
+        name: pwpush
+        env:
+          - name: DATABASE_URL
+            value: postgres://passwordpusher_user:passwordpusher_passwd@localhost:5432/passwordpusher_db
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      - image: docker.io/postgres:15
+        imagePullPolicy: Always
+        name: postgres
+        env:
+          - name: POSTGRES_USER
+            value: passwordpusher_user
+          - name: POSTGRES_PASSWORD
+            value: passwordpusher_passwd
+          - name: POSTGRES_DB
+            value: passwordpusher_db
+        volumeMounts:
+          - name: pwpush-database-data
+            mountPath: /var/lib/postgresql/data
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      volumes:
+      - name: pwpush-database-data
+        persistentVolumeClaim:
+          claimName: pwpush-data-pvc
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+```
+
+<Warning>
+  The PostgreSQL credentials in `persistent_deploy.yaml` (`passwordpusher_user` / `passwordpusher_passwd`) are placeholder values. Replace them with strong credentials and consider storing them in a Kubernetes `Secret` before deploying to production.
+</Warning>
+
+### Persistent volume and claim
+
+The `PersistentVolume` requests 1 Gi with `ReadWriteMany` access and the `local-path` storage class. The `PersistentVolumeClaim` binds to it by name.
+
+```yaml
+# pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pwpush-data-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /your/path/here
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  volumeMode: Filesystem
+```
+
+```yaml
+# pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pwpush-data-pvc
+  namespace: pwpush
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+  volumeMode: Filesystem
+  volumeName: pwpush-data-pv
+```
+
+---
+
+## Service and ingress
+
+### service.yaml
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pwpush
+    component: ingress-controller
+    type: nginx
+  name: pwpush-http
+  namespace: pwpush
+spec:
+  ports:
+  - name: pwpush-http
+    port: 5100
+    protocol: TCP
+    targetPort: 5100
+  selector:
+    app: pwpush
+    component: ingress-controller
+    type: nginx
+  sessionAffinity: None
+  type: ClusterIP
+```
+
+### ingress.yaml
+
+```yaml
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    ingress.kubernetes.io/ssl-redirect: "true"
+    kubernetes.io/tls-acme: "true"
+  name: pwpush-ingress
+  namespace: pwpush
+spec:
+  rules:
+  - host: pwpush.domain.tld
+    http:
+      paths:
+      - backend:
+          serviceName: pwpush-http
+          servicePort: 5100
+        path: /
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - pwpush.domain.tld
+    secretName: pwpush.domain.tld
+```
+
+---
+
+## Helm chart
+
+The repository includes a basic Helm chart in `containers/helm/` that creates a Deployment and Service. It requires Helm 3 or later.
+
+### Install
+
+```bash
+helm install \
+  --create-namespace \
+  --namespace pwpush \
+  my-passwordpusher \
+  containers/helm/
+```
+
+### Access via port-forward
+
+```bash
+kubectl port-forward --namespace pwpush svc/my-passwordpusher-helm 5555:5100
+```
+
+Then open `http://localhost:5555` in your browser.
+
+### Uninstall
+
+```bash
+helm uninstall \
+  -n pwpush \
+  my-passwordpusher
+```
+
+### Key values
+
+The chart's `values.yaml` exposes the following configuration:
+
+| Key                     | Default                          | Description                                             |
+| ----------------------- | -------------------------------- | ------------------------------------------------------- |
+| `replicaCount`          | `1`                              | Number of pod replicas                                  |
+| `image.repository`      | `docker.io/pglombardo/pwpush`    | Container image repository                              |
+| `image.tag`             | `stable`                         | Image tag                                               |
+| `image.pullPolicy`      | `Always`                         | Image pull policy                                       |
+| `encKeys.existingSecret`| `pwpush-keys`                   | Secret name for `PWPUSH_MASTER_KEY` and `SECRET_KEY_BASE` |
+| `service.type`          | `ClusterIP`                      | Kubernetes service type                                 |
+| `service.port`          | `5100`                           | Service port                                            |
+| `ingress.enabled`       | `false`                          | Enable ingress resource                                 |
+| `ingress.className`     | `nginx`                          | Ingress class                                           |
+| `env`                   | `{}`                             | Additional environment variables for the pod            |
+
+<Tip>
+  For production deployments, create a Kubernetes `Secret` named `pwpush-keys` containing `PWPUSH_MASTER_KEY` and `SECRET_KEY_BASE`, and reference it via `encKeys.existingSecret` in `values.yaml`.
+</Tip>
+
+Full `values.yaml`:
+
+```yaml
+---
+nameOverride: ""
+fullnameOverride: ""
+replicaCount: 1
+
+image:
+  repository: docker.io/pglombardo/pwpush
+  pullPolicy: Always
+  tag: "stable"
+
+labels:
+  app: "pwpush"
+podLabels:
+  app: "pwpush"
+
+encKeys:
+  existingSecret: "pwpush-keys"  # Secret containing PWPUSH_MASTER_KEY and SECRET_KEY_BASE (optional)
+
+env: {}
+# Optional env map for the pod. See repo docker-compose.yml and:
+# https://docs.pwpush.com/docs/self-hosted-configuration/
+# Common examples:
+#   PWPUSH_MASTER_KEY: ""
+#   SECRET_KEY_BASE: ""
+#   PWP__ALLOW_ANONYMOUS: "true"
+#   PWP__DISABLE_SIGNUPS: "false"
+#   PWP__DISABLE_LOGINS: "false"
+#   PWP__ENABLE_USER_ACCOUNT_EMAILS: "false"
+#   PWP__ENABLE_URL_PUSHES: "true"
+#   PWP__ENABLE_FILE_PUSHES: "true"
+#   PWP__ENABLE_QR_PUSHES: "true"
+#   PWP__FILES__STORAGE: "local"
+#   PWP__LOG_TO_STDOUT: "true"
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+
+resources: {}
+
+service:
+  type: ClusterIP
+  port: 5100
+  sessionAffinity: None
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: pwpush.example.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+volumeMounts: []
+volumes: []
+```

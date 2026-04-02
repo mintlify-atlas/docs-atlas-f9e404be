@@ -1,0 +1,76 @@
+---
+title: 'Configuration overview'
+description: 'Two ways to configure Password Pusher: environment variables for container deployments and settings.yml for direct installs.'
+---
+
+Password Pusher is configured through two complementary mechanisms. You can use either or both at the same time—environment variables always take precedence over values in `settings.yml`.
+
+## Configuration methods
+
+<CardGroup cols={2}>
+  <Card title="Environment variables" icon="terminal">
+    The recommended approach for Docker and container deployments. Every setting has a `PWP__` prefixed environment variable equivalent. Set variables in your `docker-compose.yml`, Kubernetes manifest, or container runtime.
+  </Card>
+  <Card title="settings.yml" icon="file">
+    A YAML file at `config/settings.yml` in the application root. Best suited for direct (non-container) Ruby on Rails deployments. Edit the file and restart the application for changes to take effect.
+  </Card>
+</CardGroup>
+
+## The PWP__ prefix convention
+
+All environment variable overrides use the `PWP__` prefix (two underscores). Nested YAML keys map to deeper levels using additional double underscores.
+
+| YAML path | Environment variable |
+|---|---|
+| `host_domain` | `PWP__HOST_DOMAIN` |
+| `mail.smtp_port` | `PWP__MAIL__SMTP_PORT` |
+| `files.storage` | `PWP__FILES__STORAGE` |
+| `files.s3.region` | `PWP__FILES__S3__REGION` |
+| `throttling.minute` | `PWP__THROTTLING__MINUTE` |
+| `brand.title` | `PWP__BRAND__TITLE` |
+
+<Note>
+  `PWP_PRECOMPILE` is a special case—it uses a single underscore (no double underscore) and is only supported as an environment variable.
+</Note>
+
+### Example: Docker Compose
+
+```yaml docker-compose.yml
+services:
+  pwpush:
+    image: pglombardo/pwpush:latest
+    environment:
+      PWP__HOST_DOMAIN: 'pwpush.example.com'
+      PWP__HOST_PROTOCOL: 'https'
+      PWP__ALLOW_ANONYMOUS: 'false'
+      PWP__MAIL__SMTP_ADDRESS: 'smtp.example.com'
+      PWP__MAIL__SMTP_PORT: '587'
+```
+
+### Example: settings.yml
+
+```yaml config/settings.yml
+host_domain: 'pwpush.example.com'
+host_protocol: 'https'
+allow_anonymous: false
+
+mail:
+  smtp_port: 587
+```
+
+## Configuration categories
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/configuration/authentication">
+    Anonymous access, user signups and logins, session timeouts, SMTP/email, cookies, throttling, and data purge.
+  </Card>
+  <Card title="Push settings" icon="upload" href="/configuration/push-settings">
+    Per-kind expiration limits, retrieval steps, deletable pushes, blur, and password generator defaults.
+  </Card>
+  <Card title="File storage" icon="database" href="/configuration/file-storage">
+    Local disk, Amazon S3, MinIO, Google Cloud Storage, and Microsoft Azure Blob Storage backends.
+  </Card>
+  <Card title="Branding" icon="paintbrush" href="/configuration/branding">
+    Site title, tagline, logos, themes, GDPR banner, locale, timezone, and logging.
+  </Card>
+</CardGroup>

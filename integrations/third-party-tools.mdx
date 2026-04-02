@@ -1,0 +1,84 @@
+---
+title: "Third-Party Tools & Integrations"
+description: "Use Password Pusher from the command line, scripts, CI/CD pipelines, and community-built tools."
+---
+
+The Password Pusher JSON API makes it easy to integrate secret sharing into any workflow. Below are examples and community tools.
+
+## Shell / curl
+
+Create a push and print the secret URL in one command:
+
+```bash shell-push.sh
+#!/bin/bash
+# Usage: ./shell-push.sh "my secret"
+PAYLOAD="$1"
+RESPONSE=$(curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -d "{\"password\": {\"payload\": \"$PAYLOAD\"}}" \
+  https://pwpush.com/p.json)
+
+TOKEN=$(echo "$RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin)["url_token"])')
+echo "Secret URL: https://pwpush.com/p/$TOKEN"
+```
+
+## Python
+
+```python push.py
+import requests
+
+response = requests.post(
+    "https://pwpush.com/p.json",
+    json={"password": {"payload": "my-secret", "expire_after_views": 3}},
+    headers={"Content-Type": "application/json"}
+)
+data = response.json()
+print(f"Secret URL: https://pwpush.com/p/{data['url_token']}")
+```
+
+## PowerShell
+
+```powershell push.ps1
+$body = @{ password = @{ payload = "my-secret" } } | ConvertTo-Json
+$response = Invoke-RestMethod -Uri "https://pwpush.com/p.json" `
+  -Method POST -Body $body -ContentType "application/json"
+Write-Host "Secret URL: https://pwpush.com/p/$($response.url_token)"
+```
+
+## GitHub Actions
+
+Share a secret during a CI/CD run without exposing it in logs:
+
+```yaml .github/workflows/deploy.yml
+- name: Share deploy secret via Password Pusher
+  run: |
+    RESPONSE=$(curl -s -X POST \
+      -H "Content-Type: application/json" \
+      -d "{\"password\": {\"payload\": \"${{ secrets.DEPLOY_KEY }}\", \"expire_after_views\": 1}}" \
+      https://pwpush.com/p.json)
+    TOKEN=$(echo "$RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin)["url_token"])')
+    echo "One-time link: https://pwpush.com/p/$TOKEN"
+```
+
+## Authenticated requests
+
+For managing your pushes or accessing audit logs, add authentication headers:
+
+```bash
+curl -X GET \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  https://pwpush.com/p/active.json
+```
+
+<Tip>
+  Get your API token from your account settings page on your Password Pusher instance.
+</Tip>
+
+## Community tools
+
+The Password Pusher community has built CLIs, browser extensions, and integrations. Find the full list and submit your own at the [GitHub repository](https://github.com/pglombardo/PasswordPusher).
+
+<Note>
+  Self-hosting gives you full control over your data. See [Deploy with Docker](/deployment/docker) to run your own instance.
+</Note>

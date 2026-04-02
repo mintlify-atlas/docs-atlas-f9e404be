@@ -1,80 +1,160 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Create your first secure push in minutes — using the hosted service or your own Docker instance."
 ---
 
-## Get started in three steps
+Choose your path: use the hosted service at pwpush.com with no setup, or run your own instance with Docker Compose.
 
-Get your documentation site running locally and make your first customization.
+<Tabs>
+  <Tab title="Hosted (pwpush.com)">
+    The hosted service requires no installation. You can create and share a push in under a minute.
 
-### Step 1: Set up your local environment
+    <Steps>
+      <Step title="Open pwpush.com">
+        Navigate to [pwpush.com](https://pwpush.com) in your browser. You do not need an account to create a push.
+      </Step>
+      <Step title="Enter your secret">
+        Type or paste the text you want to share into the input field. Optionally:
+        - Set how many views the link allows before it expires (default: 5)
+        - Set how many days before it expires (default: 7)
+        - Add a passphrase that the recipient must enter to unlock the secret
+        - Enable a "retrieval step" so the recipient must click through a confirmation page first
+      </Step>
+      <Step title="Click Push it!">
+        Click the **Push it!** button. Password Pusher encrypts your secret and returns a unique one-time URL.
+      </Step>
+      <Step title="Share the link">
+        Copy the generated link and send it to the recipient through email, chat, or any channel. The link is the only way to retrieve the secret.
+      </Step>
+      <Step title="Link auto-expires">
+        After the configured number of views or days — whichever comes first — the secret is permanently deleted. Anyone who arrives after that sees only an "expired" page.
+      </Step>
+    </Steps>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    <Tip>
+      Sign up for a free account to unlock audit logs showing every view event: IP address, browser, timestamp, and referrer.
+    </Tip>
+  </Tab>
 
-### Step 2: Deploy your changes
+  <Tab title="Self-hosted (Docker Compose)">
+    Run Password Pusher on your own server with a single Docker Compose file. The image includes a built-in SQLite database, file storage, and optional automatic TLS via Let's Encrypt.
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Steps>
+      <Step title="Point DNS to your server">
+        Create an A record (or AAAA for IPv6) pointing your domain to the public IP of the server where you will run the container. For example:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+        ```
+        pwpush.example.com  A  203.0.113.10
+        ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+        This step is required only if you want automatic HTTPS. If you are evaluating locally, skip this step and access the app on port 5100.
+      </Step>
+      <Step title="Download docker-compose.yml">
+        Clone the repository or download the Compose file directly:
 
-### Step 3: Go live
+        ```bash
+        curl -O https://raw.githubusercontent.com/pglombardo/PasswordPusher/refs/heads/master/docker-compose.yml
+        ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+        The full file contents:
+
+        ```yaml docker-compose.yml
+        # Password Pusher - Docker Compose
+
+        x-env: &x-env
+          environment:
+            # PWPUSH_MASTER_KEY: ""   # Generate at https://us.pwpush.com/generate_key
+            # TLS_DOMAIN: ""          # e.g. pwpush.example.com
+
+            PWP__ENABLE_URL_PUSHES: "true"
+            PWP__ENABLE_FILE_PUSHES: "true"
+            PWP__ENABLE_QR_PUSHES: "true"
+            PWP__ALLOW_ANONYMOUS: "true"
+            PWP__FILES__STORAGE: "local"
+
+            # PWP__HOST_DOMAIN: ""
+            # PWP__HOST_PROTOCOL: "https"
+            # PWP__DISABLE_SIGNUPS: "false"
+            # ...
+
+        services:
+          pwpush:
+            image: docker.io/pglombardo/pwpush:latest
+            restart: unless-stopped
+            ports:
+              - "80:80"
+              - "443:443"
+              - "5100:5100"
+            volumes:
+              - pwpush-storage:/opt/PasswordPusher/storage
+            healthcheck:
+              test: ["CMD", "curl", "-f", "http://localhost:5100/up"]
+              interval: 30s
+              timeout: 10s
+              retries: 3
+              start_period: 40s
+            <<: *x-env
+
+        volumes:
+          pwpush-storage:
+            driver: local
+        ```
+      </Step>
+      <Step title="Set TLS_DOMAIN and (recommended) PWPUSH_MASTER_KEY">
+        Open `docker-compose.yml` in an editor and uncomment the two key lines under `x-env`:
+
+        ```yaml
+        PWPUSH_MASTER_KEY: "your-generated-key-here"
+        TLS_DOMAIN: "pwpush.example.com"
+        ```
+
+        - **`TLS_DOMAIN`** — The domain you pointed DNS to in step 1. The container automatically provisions and renews a Let's Encrypt certificate.
+        - **`PWPUSH_MASTER_KEY`** — The encryption key used to protect secrets at rest. Generate one at [us.pwpush.com/generate_key](https://us.pwpush.com/generate_key). If omitted, a built-in default key is used (fine for evaluation, not recommended for production).
+
+        <Warning>
+          If you change `PWPUSH_MASTER_KEY` after pushes have been created, existing encrypted data will become unreadable. Set it once before going live and do not rotate it without a migration plan.
+        </Warning>
+      </Step>
+      <Step title="Start the container">
+        From the directory containing `docker-compose.yml`, run:
+
+        ```bash
+        docker compose up -d
+        ```
+
+        The container starts, runs database migrations, and begins serving traffic. The first boot may take 30–40 seconds for initialization. Check readiness with:
+
+        ```bash
+        docker compose logs -f pwpush
+        ```
+      </Step>
+      <Step title="Open your instance">
+        - **With TLS_DOMAIN set:** Open `https://pwpush.example.com`
+        - **Without TLS_DOMAIN:** Open `http://your-server-ip:5100`
+
+        You should see the Password Pusher home page. Create your first push to verify everything is working.
+
+        <Tip>
+          The `pwpush-storage` Docker volume persists the SQLite database and uploaded files across container restarts and upgrades. To use a host directory instead, replace the volume with `- /path/on/host:/opt/PasswordPusher/storage`.
+        </Tip>
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="How it works" icon="circle-info" href="/how-it-works">
+    Understand the push lifecycle, encryption model, and audit logging.
+  </Card>
+  <Card title="Configuration reference" icon="sliders" href="/configuration/overview">
+    Full list of environment variables for features, branding, mail, and more.
+  </Card>
+  <Card title="API authentication" icon="code" href="/api/authentication">
+    Automate push creation with the JSON REST API.
+  </Card>
+  <Card title="Push types" icon="layer-group" href="/features/push-types">
+    Learn about text, file, URL, and QR code push types.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

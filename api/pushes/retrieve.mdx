@@ -1,0 +1,218 @@
+---
+title: 'Retrieve a push'
+description: 'Fetch a push and its decrypted payload. Each successful retrieval counts as a view.'
+---
+
+Retrieving a push decrypts and returns the payload. If the push is still active, the request is counted as a view and recorded in the audit log. Once all views are consumed or the push expires, the payload is deleted and subsequent requests return an expired record.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/p/:url_token.json` | Retrieve the push and count a view |
+| `GET` | `/p/:url_token/preview.json` | Return the push URL without counting a view |
+
+## Retrieve — `GET /p/:url_token.json`
+
+<ParamField path="url_token" type="string" required>
+  The unique token returned when the push was created.
+</ParamField>
+
+<ParamField query="passphrase" type="string">
+  Required if the push was created with a passphrase. Pass as a query parameter: `?passphrase=mysecret`.
+</ParamField>
+
+### Response
+
+<ResponseField name="url_token" type="string">
+  The unique token for this push.
+</ResponseField>
+
+<ResponseField name="payload" type="string">
+  The decrypted secret content. For URL pushes, this is the target URL. `null` if the push has expired.
+</ResponseField>
+
+<ResponseField name="expired" type="boolean">
+  Whether the push has expired.
+</ResponseField>
+
+<ResponseField name="deleted" type="boolean">
+  Whether the push was manually expired.
+</ResponseField>
+
+<ResponseField name="expire_after_days" type="integer">
+  The configured days-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="expire_after_views" type="integer">
+  The configured views-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="days_remaining" type="integer">
+  Computed days remaining before expiration.
+</ResponseField>
+
+<ResponseField name="views_remaining" type="integer">
+  Computed views remaining before expiration. Decremented by this request if the push was active.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 creation timestamp.
+</ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  ISO 8601 timestamp for date-based expiration.
+</ResponseField>
+
+<ResponseField name="files" type="array">
+  For file pushes, an array of file objects. Empty array for text and URL pushes.
+
+  <Expandable title="File object fields">
+    <ResponseField name="filename" type="string">
+      The original filename of the uploaded file.
+    </ResponseField>
+    <ResponseField name="content_type" type="string">
+      The MIME type of the file.
+    </ResponseField>
+    <ResponseField name="url" type="string">
+      The URL to download the file.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="deletable_by_viewer" type="boolean">
+  Whether the push can be expired by the recipient.
+</ResponseField>
+
+<ResponseField name="retrieval_step" type="boolean">
+  Whether the push uses a click-through confirmation step.
+</ResponseField>
+
+<ResponseField name="expired_on" type="string">
+  ISO 8601 timestamp of when the push expired. `null` if still active.
+</ResponseField>
+
+### Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET https://pwpush.com/p/fkwjfvhall92.json
+```
+
+```bash cURL with passphrase
+curl -X GET "https://pwpush.com/p/fkwjfvhall92.json?passphrase=opensesame"
+```
+
+```python Python
+import requests
+
+response = requests.get("https://pwpush.com/p/fkwjfvhall92.json")
+print(response.json())
+```
+
+```ruby Ruby
+require "net/http"
+require "json"
+require "uri"
+
+uri = URI("https://pwpush.com/p/fkwjfvhall92.json")
+response = Net::HTTP.get_response(uri)
+puts JSON.parse(response.body)
+```
+
+</CodeGroup>
+
+### Response examples
+
+```json 200 OK — active push
+{
+  "url_token": "fkwjfvhall92",
+  "payload": "correct horse battery staple",
+  "expired": false,
+  "deleted": false,
+  "expire_after_days": 7,
+  "expire_after_views": 5,
+  "days_remaining": 6,
+  "views_remaining": 4,
+  "created_at": "2023-10-20T15:32:01Z",
+  "expires_at": "2023-10-27T15:32:01Z"
+}
+```
+
+```json 200 OK — expired push
+{
+  "url_token": "fkwjfvhall92",
+  "payload": null,
+  "expired": true,
+  "deleted": false,
+  "expire_after_days": 7,
+  "expire_after_views": 5,
+  "days_remaining": 0,
+  "views_remaining": 0,
+  "created_at": "2023-10-20T15:32:01Z",
+  "expires_at": "2023-10-27T15:32:01Z"
+}
+```
+
+### Passphrase error
+
+When a push requires a passphrase and the provided value is missing or incorrect, the API returns `401 Unauthorized`:
+
+```json 401 Unauthorized
+{
+  "error": "That passphrase is incorrect.",
+  "message": "This push requires a passphrase. Please provide it using the 'passphrase' parameter (e.g. ?passphrase=mysecret)",
+  "status": "unauthorized"
+}
+```
+
+The failed passphrase attempt is logged in the push audit log under the `failed_passphrase` event kind.
+
+---
+
+## Preview — `GET /p/:url_token/preview.json`
+
+Returns the fully qualified secret URL for a push without counting a view. Use this to inspect or display the push link before deciding whether to share it.
+
+<ParamField path="url_token" type="string" required>
+  The unique token of the push to preview.
+</ParamField>
+
+### Response
+
+<ResponseField name="url" type="string">
+  The fully qualified secret URL for the push.
+</ResponseField>
+
+### Example
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  https://pwpush.com/p/fkwjfvhall92/preview.json
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://pwpush.com/p/fkwjfvhall92/preview.json",
+    headers={
+        "X-User-Email": "user@example.com",
+        "X-User-Token": "MyAPIToken",
+    },
+)
+print(response.json())
+```
+
+</CodeGroup>
+
+```json 200 OK
+{
+  "url": "https://pwpush.com/p/fkwjfvhall92"
+}
+```

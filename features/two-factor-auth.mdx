@@ -1,0 +1,91 @@
+---
+title: 'Two-factor authentication'
+description: 'Protect your Password Pusher account with TOTP-based two-factor authentication, compatible with standard authenticator apps.'
+---
+
+Two-factor authentication (2FA) adds a second verification step to your account login. After entering your password, you are prompted for a 6-digit one-time code from your authenticator app. Even if your password is compromised, an attacker cannot access your account without also controlling your authenticator.
+
+<Note>
+2FA protects your **account** (the dashboard and audit log access). It does not protect individual push links. Push links are protected separately with [passphrase protection](/features/push-types).
+</Note>
+
+---
+
+## How it works
+
+Password Pusher uses **TOTP** (Time-based One-Time Password), the same standard used by most authenticator apps. A time-based 6-digit code is generated every 30 seconds using a shared secret stored (encrypted) in your account. The secret is stored encrypted at rest using Lockbox.
+
+Compatible authenticator apps include:
+
+- Google Authenticator
+- Authy
+- 1Password
+- Microsoft Authenticator
+- Any app that supports RFC 6238 TOTP
+
+---
+
+## Enabling 2FA
+
+<Steps>
+  <Step title="Open account settings">
+    Log in and navigate to your account settings page.
+  </Step>
+  <Step title="Start 2FA setup">
+    Click **Enable two-factor authentication**. Password Pusher generates a unique OTP secret for your account and displays a QR code.
+  </Step>
+  <Step title="Scan the QR code">
+    Open your authenticator app and scan the QR code. If your app does not support QR scanning, use the manual entry key shown on the page.
+  </Step>
+  <Step title="Verify the code">
+    Enter the 6-digit code shown in your authenticator app to confirm the setup. This verifies that your app and the server are in sync.
+  </Step>
+  <Step title="Save your backup codes">
+    After verifying, Password Pusher generates **16 single-use backup codes**. Save these in a secure location. Each code can be used once to log in if you lose access to your authenticator app.
+  </Step>
+</Steps>
+
+---
+
+## Backup codes
+
+When you enable 2FA, 16 one-time backup codes are generated. These are shown **once only** — they are not stored in plaintext, only as HMAC-SHA256 digests. If you lose your backup codes and cannot access your authenticator app, you will be locked out of your account.
+
+<Warning>
+Store backup codes somewhere safe and offline. They are shown only once during setup and cannot be retrieved afterward. You can generate a new set of codes from account settings, which invalidates all previous codes.
+</Warning>
+
+---
+
+## Logging in with 2FA
+
+When 2FA is enabled on your account, the login flow becomes:
+
+<Steps>
+  <Step title="Enter email and password">
+    Standard credential entry.
+  </Step>
+  <Step title="Enter the one-time code">
+    Enter the current 6-digit code from your authenticator app, or use one of your backup codes.
+  </Step>
+</Steps>
+
+The server validates the code using a 30-second time window with a 15-second drift tolerance. Each code is single-use — replaying a used code is rejected.
+
+---
+
+## Disabling 2FA
+
+Navigate to account settings and click **Disable two-factor authentication**. This removes the OTP secret, clears all backup code digests, and removes the 2FA requirement from your account. You can re-enable 2FA at any time.
+
+---
+
+## What 2FA protects
+
+| Protected | Not protected |
+|-----------|---------------|
+| Your account dashboard | Individual push secret URLs |
+| Audit log access | Push links shared with recipients |
+| Push management (create, delete, view) | Passphrase-protected pushes (use passphrase for that) |
+
+Recipients who receive a secret push URL do not need an account or 2FA. The push URL itself is the access credential for recipients. Add a passphrase to a push if you want additional protection on the link itself.

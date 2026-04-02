@@ -1,0 +1,167 @@
+---
+title: 'Audit log'
+description: 'Retrieve the view history and event log for a push you own.'
+---
+
+The audit log records every significant event for a push: when it was created, each time it was viewed (including failed passphrase attempts), and when it expired. Use this endpoint to track who accessed a push and when.
+
+## Endpoint
+
+```
+GET /p/:url_token/audit.json
+```
+
+## Authorization
+
+Authentication is required. Only the owner of the push can retrieve its audit log. Requests from authenticated users who do not own the push return `403 Forbidden`.
+
+## Path parameters
+
+<ParamField path="url_token" type="string" required>
+  The unique token of the push whose audit log you want to retrieve.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="page" type="integer" default="1">
+  Page number to retrieve. Minimum `1`, maximum `200`. Returns up to 50 audit log entries per page, ordered by creation date descending.
+</ParamField>
+
+## Response
+
+<ResponseField name="views" type="object[]">
+  Array of audit log entries for the push.
+
+  <Expandable title="Entry fields">
+    <ResponseField name="kind" type="string">
+      The type of event. One of:
+
+      - `creation` — The push was created.
+      - `view` — The push payload was successfully retrieved.
+      - `failed_view` — A view was attempted on an already-expired push.
+      - `failed_passphrase` — A passphrase attempt was made with the wrong value.
+      - `expire` — The push was expired (manually or automatically).
+      - `admin_view` — An admin viewed the push.
+      - `owner_view` — The push owner viewed their own push.
+      - `edit` — The push was edited.
+    </ResponseField>
+
+    <ResponseField name="ip" type="string">
+      IP address of the client that triggered the event. May be `null` for server-initiated events.
+    </ResponseField>
+
+    <ResponseField name="user_agent" type="string">
+      Browser or client user-agent string. May be `null` or empty.
+    </ResponseField>
+
+    <ResponseField name="referrer" type="string">
+      The HTTP referrer header sent with the request. May be `null` or empty.
+    </ResponseField>
+
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp of when the event occurred.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  https://pwpush.com/p/fk27vnslkd/audit.json
+```
+
+```bash cURL (page 2)
+curl -X GET \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  "https://pwpush.com/p/fk27vnslkd/audit.json?page=2"
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://pwpush.com/p/fk27vnslkd/audit.json",
+    headers={
+        "X-User-Email": "user@example.com",
+        "X-User-Token": "MyAPIToken",
+    },
+)
+print(response.json())
+```
+
+```ruby Ruby
+require "net/http"
+require "json"
+require "uri"
+
+uri = URI("https://pwpush.com/p/fk27vnslkd/audit.json")
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+
+request = Net::HTTP::Get.new(uri)
+request["X-User-Email"] = "user@example.com"
+request["X-User-Token"] = "MyAPIToken"
+
+response = http.request(request)
+puts JSON.parse(response.body)
+```
+
+</CodeGroup>
+
+```json 200 OK
+{
+  "views": [
+    {
+      "ip": "203.0.113.42",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      "referrer": "https://example.com",
+      "created_at": "2023-10-20T16:05:12Z",
+      "kind": "view"
+    },
+    {
+      "ip": "203.0.113.10",
+      "user_agent": "curl/7.88.1",
+      "referrer": null,
+      "created_at": "2023-10-20T15:58:44Z",
+      "kind": "failed_passphrase"
+    },
+    {
+      "ip": "203.0.113.55",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      "referrer": null,
+      "created_at": "2023-10-20T15:45:30Z",
+      "kind": "creation"
+    }
+  ]
+}
+```
+
+## Error responses
+
+```json 403 Forbidden
+{
+  "error": "That push doesn't belong to you."
+}
+```
+
+```json 401 Unauthorized
+{}
+```
+
+```json 400 Bad Request
+{
+  "error": "Invalid page parameter"
+}
+```
+
+```json 404 Not Found
+{
+  "error": "not-found"
+}
+```

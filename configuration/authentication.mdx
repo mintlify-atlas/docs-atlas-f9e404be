@@ -1,0 +1,350 @@
+---
+title: 'Authentication'
+description: 'Configure anonymous access, user signups and logins, session timeouts, SMTP email, secure cookies, rate limiting, and data retention.'
+---
+
+## Anonymous access
+
+### allow_anonymous
+
+Controls whether unauthenticated users can create pushes.
+
+| | |
+|---|---|
+| **YAML key** | `allow_anonymous` |
+| **Env var** | `PWP__ALLOW_ANONYMOUS` |
+| **Default** | `true` |
+
+```yaml settings.yml
+allow_anonymous: true
+```
+
+```bash environment variable
+PWP__ALLOW_ANONYMOUS='false'
+```
+
+<Note>
+  Disabling anonymous access restricts push creation to logged-in users only. It does not affect the retrieval of existing secret URLs—anonymous access is always permitted there.
+</Note>
+
+---
+
+## Signups and logins
+
+### disable_signups
+
+Prevents new user accounts from being created. Set this after your desired accounts are in place.
+
+| | |
+|---|---|
+| **YAML key** | `disable_signups` |
+| **Env var** | `PWP__DISABLE_SIGNUPS` |
+| **Default** | `false` |
+
+```yaml settings.yml
+disable_signups: false
+```
+
+```bash environment variable
+PWP__DISABLE_SIGNUPS='true'
+```
+
+### disable_logins
+
+When `true`, the login UI is hidden and new sessions are blocked (`GET /users/sign_in` and `POST /users/sign_in` respond with 404). Useful for anonymous-only deployments.
+
+| | |
+|---|---|
+| **YAML key** | `disable_logins` |
+| **Env var** | `PWP__DISABLE_LOGINS` |
+| **Default** | `false` |
+
+```yaml settings.yml
+disable_logins: false
+```
+
+```bash environment variable
+PWP__DISABLE_LOGINS='true'
+```
+
+### login_session_timeout
+
+The duration of inactivity after which a user session expires and the user must re-authenticate.
+
+| | |
+|---|---|
+| **YAML key** | `login_session_timeout` |
+| **Env var** | `PWP__LOGIN_SESSION_TIMEOUT` |
+| **Default** | `"2 hours"` |
+
+Accepted time formats:
+
+```yaml settings.yml
+login_session_timeout: "15 minutes"
+login_session_timeout: "2 hours"
+login_session_timeout: "1 day"
+login_session_timeout: "3 weeks"
+login_session_timeout: "1 month"
+```
+
+```bash environment variable
+PWP__LOGIN_SESSION_TIMEOUT='1 day'
+```
+
+### signup_email_regexp
+
+A Ruby regular expression that validates email addresses during signup. Extend this to restrict signups to specific domains.
+
+| | |
+|---|---|
+| **YAML key** | `signup_email_regexp` |
+| **Env var** | `PWP__SIGNUP_EMAIL_REGEXP` |
+| **Default** | `'\A[^@\s]+@[^@\s]+\z'` |
+
+```yaml settings.yml
+# Allow any valid email address (default)
+signup_email_regexp: '\A[^@\s]+@[^@\s]+\z'
+
+# Restrict to a single domain
+signup_email_regexp: '\A[^@\s]+@(example\.com)\z'
+
+# Allow multiple domains
+signup_email_regexp: '\A[^@\s]+@(example\.com|corp\.org)\z'
+```
+
+```bash environment variable
+PWP__SIGNUP_EMAIL_REGEXP='\A[^@\s]+@(example\.com)\z'
+```
+
+<Tip>
+  Use https://rubular.com to test your regular expressions interactively.
+</Tip>
+
+### enable_user_account_emails
+
+When `true`, the application sends transactional emails for signup confirmation, account unlock after failed login attempts, and password reset.
+
+| | |
+|---|---|
+| **YAML key** | `enable_user_account_emails` |
+| **Env var** | `PWP__ENABLE_USER_ACCOUNT_EMAILS` |
+| **Default** | `false` |
+
+```yaml settings.yml
+enable_user_account_emails: false
+```
+
+```bash environment variable
+PWP__ENABLE_USER_ACCOUNT_EMAILS='true'
+```
+
+<Warning>
+  Do not enable this setting until you have a working SMTP server configured in the Mail section below and have confirmed that email delivery is functioning. Enabling without a working mail server will break signup, password reset, and account unlock flows.
+</Warning>
+
+---
+
+## Mail / SMTP
+
+Required when `enable_user_account_emails` is `true`. All keys live under the `mail:` block and map to `PWP__MAIL__*` environment variables.
+
+<Note>
+  Also set `host_domain` and `host_protocol` at the top level of `settings.yml` so that links in email messages resolve correctly.
+</Note>
+
+### smtp_address
+
+The hostname of the remote SMTP server.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_address` |
+| **Env var** | `PWP__MAIL__SMTP_ADDRESS` |
+| **Default** | `localhost` |
+
+### smtp_port
+
+Port of the SMTP server.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_port` |
+| **Env var** | `PWP__MAIL__SMTP_PORT` |
+| **Default** | `587` |
+
+### smtp_authentication
+
+Authentication type. One of `plain`, `login`, or `cram_md5`. Comment out or omit if your server does not require authentication.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_authentication` |
+| **Env var** | `PWP__MAIL__SMTP_AUTHENTICATION` |
+| **Default** | _(unset)_ |
+
+### smtp_user_name
+
+SMTP username when authentication is required.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_user_name` |
+| **Env var** | `PWP__MAIL__SMTP_USER_NAME` |
+| **Default** | _(unset)_ |
+
+### smtp_password
+
+SMTP password when authentication is required.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_password` |
+| **Env var** | `PWP__MAIL__SMTP_PASSWORD` |
+| **Default** | _(unset)_ |
+
+### smtp_enable_starttls_auto
+
+Detects if STARTTLS is available on the SMTP server and uses it automatically.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_enable_starttls_auto` |
+| **Env var** | `PWP__MAIL__SMTP_ENABLE_STARTTLS_AUTO` |
+| **Default** | `true` |
+
+### smtp_open_timeout
+
+Seconds to wait while opening a connection to the SMTP server.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_open_timeout` |
+| **Env var** | `PWP__MAIL__SMTP_OPEN_TIMEOUT` |
+| **Default** | `10` |
+
+### smtp_read_timeout
+
+Seconds to wait for a read response from the SMTP server.
+
+| | |
+|---|---|
+| **YAML key** | `mail.smtp_read_timeout` |
+| **Env var** | `PWP__MAIL__SMTP_READ_TIMEOUT` |
+| **Default** | `10` |
+
+### Full SMTP example
+
+```yaml settings.yml
+mail:
+  smtp_address: 'smtp.sendgrid.net'
+  smtp_port: 587
+  smtp_authentication: 'plain'
+  smtp_user_name: 'apikey'
+  smtp_password: 'SG.xxxxxxxxxxxx'
+  smtp_enable_starttls_auto: true
+  smtp_open_timeout: 10
+  smtp_read_timeout: 10
+```
+
+```bash environment variables
+PWP__MAIL__SMTP_ADDRESS='smtp.sendgrid.net'
+PWP__MAIL__SMTP_PORT='587'
+PWP__MAIL__SMTP_AUTHENTICATION='plain'
+PWP__MAIL__SMTP_USER_NAME='apikey'
+PWP__MAIL__SMTP_PASSWORD='SG.xxxxxxxxxxxx'
+PWP__MAIL__SMTP_ENABLE_STARTTLS_AUTO='true'
+```
+
+---
+
+## Secure cookies
+
+### secure_cookies
+
+Enables HTTPS-only cookies, JavaScript access prevention, and same-site cookie restrictions.
+
+| | |
+|---|---|
+| **YAML key** | `secure_cookies` |
+| **Env var** | `PWP__SECURE_COOKIES` |
+| **Default** | `false` |
+
+```yaml settings.yml
+secure_cookies: false
+```
+
+```bash environment variable
+PWP__SECURE_COOKIES='true'
+```
+
+<Tip>
+  Enable `secure_cookies` for any production deployment that uses HTTPS.
+</Tip>
+
+---
+
+## Throttling
+
+Rack::Attack rate limiting. Controls how many HTTP requests a single client can make within a given time window.
+
+### throttling.minute
+
+Maximum number of HTTP requests allowed per minute per client.
+
+| | |
+|---|---|
+| **YAML key** | `throttling.minute` |
+| **Env var** | `PWP__THROTTLING__MINUTE` |
+| **Default** | `120` |
+
+### throttling.second
+
+Maximum number of HTTP requests allowed per second per client.
+
+| | |
+|---|---|
+| **YAML key** | `throttling.second` |
+| **Env var** | `PWP__THROTTLING__SECOND` |
+| **Default** | `60` |
+
+```yaml settings.yml
+throttling:
+  minute: 120
+  second: 60
+```
+
+```bash environment variables
+PWP__THROTTLING__MINUTE='60'
+PWP__THROTTLING__SECOND='20'
+```
+
+---
+
+## Data purge
+
+### purge_after
+
+Sets how long expired push metadata (expiration settings, audit logs) is retained before permanent deletion. Defaults to `"disabled"`, meaning data is never automatically purged.
+
+| | |
+|---|---|
+| **YAML key** | `purge_after` |
+| **Env var** | `PWP__PURGE_AFTER` |
+| **Default** | `"disabled"` |
+
+```yaml settings.yml
+purge_after: "disabled"
+# purge_after: "3 months"
+# purge_after: "6 months"
+# purge_after: "1 year"
+# purge_after: "2 years"
+# purge_after: "3 years"
+```
+
+```bash environment variable
+PWP__PURGE_AFTER='3 months'
+```
+
+<Warning>
+  Purged data is permanently and irretrievably deleted. Set this value conservatively and ensure you understand your data-retention requirements before enabling.
+</Warning>

@@ -1,0 +1,356 @@
+---
+title: 'Create a push'
+description: 'Create a new text, file, or URL push and receive a secret shareable URL.'
+---
+
+Creating a push encrypts and stores your secret, then returns a unique URL token you can share. The push automatically expires after the configured number of views or days — whichever comes first.
+
+## Endpoints
+
+| Method | Path | Kind |
+|--------|------|------|
+| `POST` | `/p.json` | Text / password push |
+| `POST` | `/f.json` | File push |
+| `POST` | `/r.json` | URL redirect push |
+
+All three endpoints share the same controller and response shape. The path determines the default `kind` when the `kind` parameter is omitted.
+
+<Note>
+  Anonymous push creation is allowed by default. To associate a push with your account (required for listing, auditing, and expiring), include authentication headers. See [Authentication](/api/authentication).
+</Note>
+
+## Request parameters
+
+### Text push — `POST /p.json`
+
+Use the `password[...]` namespace for text pushes.
+
+<ParamField body="password[payload]" type="string" required>
+  The secret text to encrypt and share. Maximum size is 1 MB. URL-encode the value when sending as form data.
+</ParamField>
+
+<ParamField body="password[passphrase]" type="string">
+  Require recipients to enter this passphrase before viewing the push. Stored encrypted.
+</ParamField>
+
+<ParamField body="password[name]" type="string">
+  A label shown in the dashboard, notifications, and emails. Not visible to recipients.
+</ParamField>
+
+<ParamField body="password[note]" type="string">
+  A private note visible only to the push creator. Requires authentication.
+</ParamField>
+
+<ParamField body="password[expire_after_days]" type="integer">
+  Number of days until the push expires. Must be within the instance's configured min/max range. Defaults to the instance setting.
+</ParamField>
+
+<ParamField body="password[expire_after_views]" type="integer">
+  Number of views until the push expires. Must be within the instance's configured min/max range. Defaults to the instance setting.
+</ParamField>
+
+<ParamField body="password[deletable_by_viewer]" type="boolean">
+  When `true`, recipients can delete (expire) the push themselves. Defaults to the instance setting.
+</ParamField>
+
+<ParamField body="password[retrieval_step]" type="boolean">
+  When `true`, adds a click-through confirmation page before revealing the secret. Helps prevent chat apps and URL scanners from consuming views automatically.
+</ParamField>
+
+<ParamField body="password[kind]" type="string">
+  Explicit push type. One of `text`, `file`, `url`, or `qr`. When omitted, the kind is inferred from the request path.
+</ParamField>
+
+<ParamField body="password[files][]" type="file[]">
+  One or more file attachments. Requires authentication. Sending files via `/p.json` with this parameter automatically creates a file push regardless of the `kind` parameter.
+</ParamField>
+
+### File push — `POST /f.json`
+
+Use the `file_push[...]` namespace instead of `password[...]`. Accepts the same parameters plus file attachments.
+
+<ParamField body="file_push[payload]" type="string">
+  Optional text payload to include alongside the files.
+</ParamField>
+
+<ParamField body="file_push[files][]" type="file[]" required>
+  One or more file attachments to upload.
+</ParamField>
+
+<ParamField body="file_push[passphrase]" type="string">
+  Passphrase to protect the push.
+</ParamField>
+
+<ParamField body="file_push[expire_after_days]" type="integer">
+  Days until expiration.
+</ParamField>
+
+<ParamField body="file_push[expire_after_views]" type="integer">
+  Views until expiration.
+</ParamField>
+
+<ParamField body="file_push[deletable_by_viewer]" type="boolean">
+  Allow recipients to expire the push.
+</ParamField>
+
+<ParamField body="file_push[retrieval_step]" type="boolean">
+  Add a click-through step before revealing files.
+</ParamField>
+
+<ParamField body="file_push[name]" type="string">
+  Dashboard label.
+</ParamField>
+
+<ParamField body="file_push[note]" type="string">
+  Private creator-only note.
+</ParamField>
+
+### URL push — `POST /r.json`
+
+Use the `url[...]` namespace. Pushes a URL that the recipient is redirected to after viewing. Does not support `deletable_by_viewer`.
+
+<ParamField body="url[payload]" type="string" required>
+  A valid HTTP or HTTPS URL to redirect recipients to.
+</ParamField>
+
+<ParamField body="url[passphrase]" type="string">
+  Passphrase required to view the push.
+</ParamField>
+
+<ParamField body="url[expire_after_days]" type="integer">
+  Days until expiration.
+</ParamField>
+
+<ParamField body="url[expire_after_views]" type="integer">
+  Views until expiration.
+</ParamField>
+
+<ParamField body="url[retrieval_step]" type="boolean">
+  Add a click-through step before the redirect.
+</ParamField>
+
+<ParamField body="url[name]" type="string">
+  Dashboard label.
+</ParamField>
+
+<ParamField body="url[note]" type="string">
+  Private creator-only note.
+</ParamField>
+
+## Response
+
+<ResponseField name="url_token" type="string">
+  The unique token that identifies this push. Append to the instance base URL to form the shareable link: `https://pwpush.com/p/{url_token}`.
+</ResponseField>
+
+<ResponseField name="html_url" type="string">
+  Fully qualified URL for viewing the push in a browser.
+</ResponseField>
+
+<ResponseField name="json_url" type="string">
+  Fully qualified URL for retrieving the push via the API.
+</ResponseField>
+
+<ResponseField name="expired" type="boolean">
+  Whether the push has expired.
+</ResponseField>
+
+<ResponseField name="deleted" type="boolean">
+  Whether the push was manually expired by the owner or a viewer.
+</ResponseField>
+
+<ResponseField name="expire_after_days" type="integer">
+  The configured days-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="expire_after_views" type="integer">
+  The configured views-until-expiration setting.
+</ResponseField>
+
+<ResponseField name="days_remaining" type="integer">
+  Computed days remaining before the push expires.
+</ResponseField>
+
+<ResponseField name="views_remaining" type="integer">
+  Computed views remaining before the push expires.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of when the push was created.
+</ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  ISO 8601 timestamp of when the push will expire by date.
+</ResponseField>
+
+<ResponseField name="passphrase" type="string">
+  The passphrase set on the push. Included in the response for all create, list, and show requests.
+</ResponseField>
+
+<ResponseField name="note" type="string">
+  The private note. Included in the response for create, active, and expired list requests.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The dashboard label. Included in the response for create, active, and expired list requests.
+</ResponseField>
+
+<ResponseField name="files" type="array">
+  For file pushes, an array of file objects. Empty array for text and URL pushes.
+
+  <Expandable title="File object fields">
+    <ResponseField name="filename" type="string">
+      The original filename of the uploaded file.
+    </ResponseField>
+    <ResponseField name="content_type" type="string">
+      The MIME type of the file.
+    </ResponseField>
+    <ResponseField name="url" type="string">
+      The URL to download the file.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="deletable_by_viewer" type="boolean">
+  Whether the push can be expired by the recipient.
+</ResponseField>
+
+<ResponseField name="retrieval_step" type="boolean">
+  Whether the push has a click-through confirmation page before the secret is shown.
+</ResponseField>
+
+<ResponseField name="expired_on" type="string">
+  ISO 8601 timestamp of when the push expired. `null` if not yet expired.
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  ISO 8601 timestamp of the last update to the push record.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash Text push (anonymous)
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"password": {"payload": "correct horse battery staple"}}' \
+  https://pwpush.com/p.json
+```
+
+```bash Text push (authenticated)
+curl -X POST \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "password": {
+      "payload": "correct horse battery staple",
+      "passphrase": "opensesame",
+      "expire_after_days": 3,
+      "expire_after_views": 5,
+      "deletable_by_viewer": false,
+      "retrieval_step": true,
+      "note": "For new employee onboarding"
+    }
+  }' \
+  https://pwpush.com/p.json
+```
+
+```bash File push
+curl -X POST \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  -F "password[payload]=cover note text" \
+  -F "password[files][]=@/path/to/credentials.pdf" \
+  -F "password[files][]=@/path/to/config.json" \
+  https://pwpush.com/p.json
+```
+
+```bash URL push
+curl -X POST \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  -H "Content-Type: application/json" \
+  -d '{"url": {"payload": "https://internal.example.com/onboarding"}}' \
+  https://pwpush.com/r.json
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://pwpush.com/p.json",
+    headers={
+        "X-User-Email": "user@example.com",
+        "X-User-Token": "MyAPIToken",
+        "Content-Type": "application/json",
+    },
+    json={
+        "password": {
+            "payload": "correct horse battery staple",
+            "expire_after_views": 5,
+        }
+    },
+)
+print(response.json())
+```
+
+```ruby Ruby
+require "net/http"
+require "json"
+require "uri"
+
+uri = URI("https://pwpush.com/p.json")
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+
+request = Net::HTTP::Post.new(uri.path)
+request["X-User-Email"] = "user@example.com"
+request["X-User-Token"] = "MyAPIToken"
+request["Content-Type"] = "application/json"
+request.body = JSON.dump({
+  password: {
+    payload: "correct horse battery staple",
+    expire_after_views: 5
+  }
+})
+
+response = http.request(request)
+puts JSON.parse(response.body)
+```
+
+</CodeGroup>
+
+### Response example
+
+```json 201 Created
+{
+  "url_token": "fkwjfvhall92",
+  "html_url": "https://pwpush.com/p/fkwjfvhall92",
+  "json_url": "https://pwpush.com/p/fkwjfvhall92.json",
+  "expired": false,
+  "deleted": false,
+  "expire_after_days": 7,
+  "expire_after_views": 5,
+  "days_remaining": 7,
+  "views_remaining": 5,
+  "created_at": "2023-10-20T15:32:01Z",
+  "expires_at": "2023-10-27T15:32:01Z",
+  "passphrase": "",
+  "note": "",
+  "name": ""
+}
+```
+
+### Error responses
+
+```json 422 Unprocessable Content
+{
+  "payload": ["Payload is required."]
+}
+```
+
+```json 401 Unauthorized
+{}
+```

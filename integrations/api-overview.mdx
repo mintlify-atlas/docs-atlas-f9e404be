@@ -1,0 +1,84 @@
+---
+title: "API Overview"
+description: "Integrate with Password Pusher using the JSON REST API to automate secret sharing."
+---
+
+Password Pusher exposes a JSON REST API for creating and managing pushes programmatically. Use it with `curl`, scripts, or any HTTP client.
+
+<Info>
+  All API endpoints return JSON. Append `.json` to endpoint paths (e.g. `/p.json`, `/p/:token.json`).
+</Info>
+
+## Base URL
+
+Use your Password Pusher instance URL as the base:
+
+```
+https://pwpush.com        # hosted service
+https://your-instance.com # self-hosted
+```
+
+## Authentication
+
+Authenticated requests require two headers:
+
+```bash
+X-User-Email: your@email.com
+X-User-Token: your_api_token
+```
+
+Get your API token from your account settings page. See [API Authentication](/api/authentication) for details.
+
+**Anonymous access** is available for creating pushes when `PWP__ALLOW_ANONYMOUS=true` (the default). Listing your pushes, accessing audit logs, and deleting owned pushes all require authentication.
+
+## Quick examples
+
+<CodeGroup>
+
+```bash Anonymous push
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"password": {"payload": "secret_text"}}' \
+  https://pwpush.com/p.json
+```
+
+```bash Authenticated push
+curl -X POST \
+  -H "X-User-Email: user@example.com" \
+  -H "X-User-Token: MyAPIToken" \
+  -H "Content-Type: application/json" \
+  -d '{"password": {"payload": "secret_text"}}' \
+  https://pwpush.com/p.json
+```
+
+</CodeGroup>
+
+## Endpoints
+
+| Method | Path | Auth required | Description |
+|--------|------|---------------|-------------|
+| `POST` | `/p.json` | No | Create a text/password push |
+| `GET` | `/p/:url_token.json` | No | Retrieve a push (counts as a view) |
+| `DELETE` | `/p/:url_token.json` | Owner or deletable_by_viewer | Expire a push immediately |
+| `GET` | `/p/:url_token/preview.json` | No | Get push URL without counting a view |
+| `GET` | `/p/:url_token/audit.json` | Yes (owner only) | Retrieve the audit log |
+| `GET` | `/p/active.json` | Yes | List your active pushes |
+| `GET` | `/p/expired.json` | Yes | List your expired pushes |
+| `POST` | `/f.json` | No | Create a file push |
+| `POST` | `/r.json` | No | Create a URL redirect push |
+| `GET` | `/api/v1/version` | No | Get the API version |
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    How to get and use your API token
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/api/rate-limits">
+    Request limits and best practices
+  </Card>
+  <Card title="Create a Push" icon="plus" href="/api/pushes/create">
+    Full parameter reference for creating pushes
+  </Card>
+  <Card title="Retrieve a Push" icon="eye" href="/api/pushes/retrieve">
+    Retrieve push content via the API
+  </Card>
+</CardGroup>
